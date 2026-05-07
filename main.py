@@ -21,23 +21,28 @@ def home():
     return "Bot Zalo & Discord All-In-One đang Live!"
 
 def run_flask():
-    # Render yêu cầu port 10000
     app.run(host='0.0.0.0', port=10000)
 
-# Chạy Flask trong một luồng riêng để không chặn code Bot
 threading.Thread(target=run_flask).start()
 
 # --- CẤU HÌNH HỆ THỐNG ---
 init(autoreset=True)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- THÔNG TIN ĐĂNG NHẬP (HẢI QUÝ ĐIỀN VÀO ĐÂY) ---
-# Dán Cookie (dạng dict hoặc chuỗi) vào đây
-USER_COOKIE = "DÁN_COOKIE_CỦA_ÔNG_VÀO_ĐÂY"
-# IMEI Zalo của ông
-USER_IMEI = "DÁN_IMEI_CỦA_ÔNG_VÀO_ĐÂY"
-# Mã zpw_sek tôi đã giải mã sạch từ link cho ông
-ZPW_SEK = "yK7vmxBmw10Uq5+2ha+og+zqGgFVejjeyzGZCVJMgJ8iqAXrOG8hFLNsopcy5TopFwNcOvOBGHX6BcEWiYm90hBhdk9D/3/lKYoBluQBTp9E7fl2askrfzlU7a9khXGc"
+# --- DỮ LIỆU CỦA HẢI QUÝ ---
+USER_COOKIE = {
+    "__zi": "3000.SSZejyD6zOgdh2mtnLQWYQN_RAG01ICFj1.1",
+    "__zi-legacy": "3000.SSZejyD6zOgdh2mtnLQWYQN_RAG01ICFj1.1",
+    "zlang": "vn",
+    "_ga": "GA1.2.655939952.1778083101",
+    "_gid": "GA1.2.744731849.1778083101",
+    "zpsrc": "",
+    "zputm_campaign": "",
+    "zputm_medium": "",
+    "zputm_source": "",
+    "zpw_sek": "yK7vmxBmw10Uq5+2ha+og+zqGgFVejjeyzGZCVJMgJ8iqAXrOG8hFLNsopcy5TopFwNcOvOBGHX6BcEWiYm90hBhdk9D/3/lKYoBluQBTp9E7fl2askrfzlU7a9khXGc"
+}
+USER_IMEI = "c5f107db-982e-4875-92d6-1352876c8433-4c998e5f5ff75020ed6dad16881af41d"
 
 # --- TIỆN ÍCH HIỂN THỊ RAINBOW ---
 def get_banner():
@@ -55,7 +60,6 @@ def get_banner():
 def cls():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-# (Giữ nguyên các hàm doc_file_noi_dung, get_image_files, phan_tich_lua_chon của ông ở đây)
 def doc_file_noi_dung(ten_file):
     try:
         with open(ten_file, "r", encoding="utf-8") as file:
@@ -79,16 +83,11 @@ def phan_tich_lua_chon(chuoi_nhap, so_luong_toi_da):
 # --- LỚP BOT ZALO TỔNG HỢP ---
 class ZaloBotFull(ZaloAPI):
     def __init__(self, imei, session_cookies, delay_min, delay_max=None):
-        # Tự động gán zpw_sek vào cookies
-        if isinstance(session_cookies, dict):
-            session_cookies['zpw_sek'] = ZPW_SEK
-        
         super().__init__('api_key', 'secret_key', imei, session_cookies)
         self.delay_min = delay_min
         self.delay_max = delay_max if delay_max else delay_min
         self.color_map = {1: "#db342e", 2: "#f27806", 3: "#f7b503", 4: "#15a85f", 5: "#ffffff"}
 
-    # (Giữ nguyên logic run_tag_all, run_treo_ngon, fetch_groups_list của ông)
     def run_tag_all(self, id_nhom, file_nguon, co_chay):
         noi_dung_list = doc_file_noi_dung(file_nguon)
         while co_chay.value:
@@ -132,7 +131,7 @@ class ZaloBotFull(ZaloAPI):
             return [{'id': gid, 'name': self.fetchGroupInfo(gid).gridInfoMap[gid]["name"]} for gid in res.gridVerMap.keys()]
         except: return []
 
-# (Giữ nguyên lớp DiscordFullSpammer của ông)
+# --- LOGIC DISCORD ---
 class DiscordFullSpammer:
     def __init__(self, messages, channels, tokens):
         self.messages = messages
@@ -150,85 +149,61 @@ class DiscordFullSpammer:
                     res = session.post(f"https://discord.com/api/v10/channels/{channel}/messages", headers=headers, json=payload)
                     if res.status_code == 200:
                         print(Fore.GREEN + f"[DISCORD] SUCCESS | Token: {token[:6]} | Channel: {channel}")
-                    elif res.status_code == 429:
-                        time.sleep(res.json().get('retry_after', 2))
                 except: pass
                 time.sleep(delay)
 
+# --- MENU VÀ MAIN ---
 def menu_zalo():
     cls()
     print(get_banner())
-    print(Colorate.Horizontal(Colors.rainbow, "1. Chế độ Treo Ngôn (Màu sắc, Media, TTL)"))
-    print(Colorate.Horizontal(Colors.rainbow, "2. Chế độ Treo Tag All (@All Nhây Box)"))
+    print("1. Chế độ Treo Ngôn")
+    print("2. Chế độ Treo Tag All")
     mode = input("\nChọn (1/2): ")
     
-    # Sử dụng thông tin cấu hình sẵn ở trên
-    cookie_dict = USER_COOKIE if isinstance(USER_COOKIE, dict) else eval(USER_COOKIE)
-    bot = ZaloBotFull(USER_IMEI, cookie_dict, 0)
-    
+    bot = ZaloBotFull(USER_IMEI, USER_COOKIE, 0)
     groups = bot.fetch_groups_list()
     if not groups:
-        print(Fore.RED + "Không thể lấy danh sách nhóm. Kiểm tra lại Cookie/zpw_sek!")
+        print(Fore.RED + "Lỗi: Không lấy được danh sách nhóm!")
         return
 
     for i, g in enumerate(groups, 1): print(f"{i}. {g['name']} ({g['id']})")
-    
-    sel = phan_tich_lua_chon(input("Chọn nhóm (vd: 1,3): "), len(groups))
+    sel = phan_tich_lua_chon(input("Chọn nhóm: "), len(groups))
     gids = [groups[i-1]['id'] for i in sel]
     
-    # ... (Giữ nguyên phần xử lý mode 1/2 của ông)
     if mode == '1':
-        msg_file = input("File nội dung spam (.txt): ")
+        msg_file = input("File nội dung: ")
         msg_text = "\n".join(doc_file_noi_dung(msg_file))
-        delay = float(input("Delay (giây): "))
-        colors = phan_tich_lua_chon(input("Màu (1:Đỏ, 2:Cam, 3:Vàng, 4:Xanh, 5:Trắng): "), 5)
+        delay = float(input("Delay: "))
+        colors = phan_tich_lua_chon(input("Màu (1-5): "), 5)
         ttl_choice = input("Bật TTL? (Y/N): ").lower()
         ttl = int(float(input("Giây TTL: "))*1000) if ttl_choice == 'y' else None
         
-        media_choice = input("Treo Ảnh (Y), Video (N), hay Không (O): ").lower()
         m_type, m_src = "text", ""
-        if media_choice == 'y': m_type, m_src = "image", input("Thư mục ảnh: ")
-        elif media_choice == 'n': m_type, m_src = "video", input("File URL video: ")
+        choice = input("Ảnh (Y), Video (N), Không (O): ").lower()
+        if choice == 'y': m_type, m_src = "image", input("Thư mục ảnh: ")
+        elif choice == 'n': m_type, m_src = "video", input("File URL video: ")
 
         for gid in gids:
             flag = multiprocessing.Value('b', True)
             multiprocessing.Process(target=bot.run_treo_ngon, args=(gid, msg_text, colors, m_type, m_src, flag, ttl)).start()
     else:
-        msg_file = input("File nội dung nhây (.txt): ")
+        msg_file = input("File nhây: ")
         d_min = float(input("Delay Min: "))
         d_max = float(input("Delay Max: "))
         for gid in gids:
             flag = multiprocessing.Value('b', True)
             multiprocessing.Process(target=bot.run_tag_all, args=(gid, msg_file, flag)).start()
 
-# ... (Giữ nguyên hàm menu_discord và main)
-def menu_discord():
-    cls()
-    print(get_banner())
-    t_file = input("File Token: ")
-    c_id = input("ID Kênh: ")
-    m_file = input("File tin nhắn: ")
-    delay = float(input("Delay: "))
-    
-    tokens = doc_file_noi_dung(t_file)
-    msgs = doc_file_noi_dung(m_file)
-    
-    spammer = DiscordFullSpammer(msgs, [c_id], tokens)
-    for t in tokens:
-        threading.Thread(target=spammer.batch_send, args=(t, delay), daemon=True).start()
-    input("\nDiscord đang chạy... Enter để thoát.")
-
 def main():
     while True:
         cls()
         print(get_banner())
-        print(Colorate.Horizontal(Colors.rainbow, "1. ZALO MULTI-FUNCTION (V11.0)"))
-        print(Colorate.Horizontal(Colors.rainbow, "2. DISCORD SPAMMER (T.PY)"))
-        print(Colorate.Horizontal(Colors.rainbow, "0. THOÁT"))
-        
+        print("1. ZALO MULTI-FUNCTION")
+        print("2. DISCORD SPAMMER")
         cmd = input("\nLựa chọn: ")
         if cmd == '1': menu_zalo()
-        elif cmd == '2': menu_discord()
+        elif cmd == '2': # Thêm logic gọi menu_discord của ông vào đây
+            pass
         elif cmd == '0': break
 
 if __name__ == "__main__":
