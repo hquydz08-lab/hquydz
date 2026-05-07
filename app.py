@@ -8,26 +8,20 @@ API_ID = 34619338
 API_HASH = "0f9eb480f7207cf57060f2f35c0ba137"
 BOSS_ID = 7153197678 
 
-# 1. String Session MỚI của ông (Đã bao bọc bằng dấu ngoặc kép)
+# Session và Token đã khớp với dữ liệu mới nhất
 SESSION_STR = "1BVtsOL0Buxx2VVdubrOn5Gwh3ZO9MWJ8BQuolTkymPcDyFnwCGYUeHUu2UdLabIVwjf_rizS42f8bMUd9NxAgL75n2Nqjssyjd1RJBn7_sYjoZMFSnOE19RMUau8-cjpOftvCUgmlK7X2SLoMi0jqrPNlPCvqF2imKuz5TcZrBbgOpFy5Rz4sYQshpds3xK6-0-eDTkEjz8hPbjRhixob_XUSTWQjQ8Sdk-XcSb-RgfCNQPF6RbLJ3gTMzJR9GRUmlN3RkLi-mfy-3obJWKz1rFayRESpDfGOF64dCiqWgPGxZLqcF047zZdnqMueLcXA_A8yT8Up2UgE5FPocxVufdEMdohedA="
-
-# 2. Token Bot War của ông
 BOT_TOKEN = "8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4"
 
-# --- HÀM TỰ ĐỘNG BÙ PADDING (FIX LỖI RENDER SẬP) ---
+# --- HÀM TỰ ĐỘNG BÙ PADDING (FIX LỖI RENDER) ---
 def fix_padding(s):
     s = s.strip()
-    missing_padding = len(s) % 4
-    if missing_padding:
-        s += '=' * (4 - missing_padding)
-    return s
+    return s + "=" * (-len(s) % 4)
 
-# --- KHỞI TẠO CLIENT ---
 client = TelegramClient(StringSession(fix_padding(SESSION_STR)), API_ID, API_HASH)
 
-# --- BỘ NGÔN 500 DÒNG ---
-NGON_NHAY = ["cn choa ei=))=))=))", "m chay anh cmnr=))=))=))", "đứng lại cho bố=))", "go di m=))", "sao im r con cho=))"] * 100
-NGON_NHAYTAG = ["mẹ m bị t cho ăn gậy vào mồm à con súc vật=))", "sao r con chó mồ côi eii=))", "cay r à con chó=))", "sủa tiếp đi m=))"] * 125
+# --- 2 BỘ NGÔN MỖI BỘ 500 DÒNG ---
+BO_NGON_1 = ["cn choa ei=))", "m chay di con kiki=))", "đứng lại cho bố bảo=))", "sao im r con súc vật=))", "cay à con cún=))"] * 100
+BO_NGON_2 = ["mẹ m bị t cho ăn gậy vào mồm à=))", "sao r con chó mồ côi eii=))", "cay r à con súc vật=))", "sủa tiếp đi m=))", "mồ côi thì im mồm vào=))"] * 100
 
 DATA_FILE = "data_hquy.json"
 def load_data():
@@ -41,7 +35,7 @@ data = load_data()
 def save_data():
     with open(DATA_FILE, "w") as f: json.dump(data, f)
 
-tasks = {"nhay": {}, "nhaytag": {}}
+tasks = {"spam": {}}
 global_delay = 0.5 
 
 def check_auth(uid):
@@ -52,12 +46,12 @@ def check_auth(uid):
         if expiry == "vinhvien" or (isinstance(expiry, (int, float)) and time.time() < expiry): return True
     return False
 
-# --- MENU CHÍNH & BẢNG GIÁ KEY (KHI NGƯỜI LẠ START) ---
+# --- MENU CHUẨN GIAO DIỆN ÔNG YÊU CẦU ---
 @client.on(events.NewMessage(pattern=r'^/menu$|^/start$'))
 async def cmd_menu(e):
     if check_auth(e.sender_id):
         await e.reply("""✨ ────────────────────────── ✨
-Rex Spam Sieu Vip Pro Max 🦖
+🦖 Spam Sieu Vip Pro Max 🦖
 ✨ ────────────────────────── ✨
 👤 OWNER: Hai Quy ⚡️ 
 🛡 Ho Tro: Tele:@hquycute
@@ -84,41 +78,42 @@ Rex Spam Sieu Vip Pro Max 🦖
 ✨ ────────────────────────── ✨
 ADMIN:HQUY""")
     else:
-        await e.reply("""📣 XÁC THỰC NGƯỜI DÙNG
-──────────────────────────
-💰 BẢNG GIÁ KEY REX SPAM:
-🎫 KEY NGÀY: 2.000 VNĐ
-🎫 KEY TUẦN: 10.000 VNĐ
-🎫 KEY THÁNG: 30.000 VNĐ
-🎫 VĨNH VIỄN: 70.000 VNĐ
-──────────────────────────
-📝 Nhập key: /nhapkey <mã_key>
+        await e.reply("""💰 BẢNG GIÁ KEY REX SPAM:
+🎫 DAY: 2.000 VNĐ | WEEK: 10.000 VNĐ | VV: 70.000 VNĐ
 👑 Mua key tại: @hquycute""")
 
-# --- LOGIC SPAM 500 DÒNG ---
+# --- XỬ LÝ LỆNH NHÂY 500 DÒNG ---
 @client.on(events.NewMessage(pattern=r'^/nhay$'))
-async def cmd_nhay(e):
+async def cmd_nhay1(e):
     if not check_auth(e.sender_id): return
-    tasks["nhay"][e.chat_id] = True
-    await e.reply("🚀 BẮT ĐẦU NHÂY 500 CÂU!")
-    for sentence in NGON_NHAY:
-        if not tasks["nhay"].get(e.chat_id): break
+    tasks["spam"][e.chat_id] = True
+    await e.reply("🚀 BẮT ĐẦU VĂNG BỘ NGÔN 1!")
+    for sentence in BO_NGON_1:
+        if not tasks["spam"].get(e.chat_id): break
+        await client.send_message(e.chat_id, sentence)
+        await asyncio.sleep(global_delay)
+
+@client.on(events.NewMessage(pattern=r'^/nhaytag$'))
+async def cmd_nhay2(e):
+    if not check_auth(e.sender_id): return
+    tasks["spam"][e.chat_id] = True
+    await e.reply("🔥 BẮT ĐẦU VĂNG BỘ NGÔN 2!")
+    for sentence in BO_NGON_2:
+        if not tasks["spam"].get(e.chat_id): break
         await client.send_message(e.chat_id, sentence)
         await asyncio.sleep(global_delay)
 
 @client.on(events.NewMessage(pattern=r'^/stop$'))
 async def cmd_stop(e):
     if not check_auth(e.sender_id): return
-    tasks["nhay"][e.chat_id] = tasks["nhaytag"][e.chat_id] = False
+    tasks["spam"][e.chat_id] = False
     await e.reply("🛑 **SPAM OFF**\nADMIN:HQUY")
 
-# Flask duy trì server Render
+# Server duy trì Render
 app = Flask(__name__)
 @app.route('/')
 def h(): return "Bot HQUY Online"
 threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080), daemon=True).start()
 
-# Khởi động Bot
-print("🚀 Bot đang lên sóng...")
 client.start(bot_token=BOT_TOKEN)
 client.run_until_disconnected()
