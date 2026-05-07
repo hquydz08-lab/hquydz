@@ -1,0 +1,6 @@
+requests
+urllib3
+colorama
+pystyle
+flask
+git+https://github.com/nhatvu87/zlapi.git
