@@ -31,7 +31,7 @@ global_delay = 0.5
 NGON_NHAY = ["cn choa ei=))=))=))=))", "m chay anh cmnr=))=))=))=))"] * 100
 NGON_NHAYTAG = ["con gái mẹ mày làm đĩ từ lúc sống đến khi chết mà 🤣"] * 100
 
-client = TelegramClient(StringSession(SESSION_STR), api_id, api_hash)
+client = TelegramClient(StringSession(1BVtsOL0Bu3ftXep1MwrLMPn8yO4m3tKwmrCkouFBDrR7vihqk4-ZCg6kK-zJaAkYu4Z96OSdBK7DNzoRMXCFrMTxi80pqi0OK95BBjcto5w0WVNHlXJikycoNa7bmNPYrXMQyRx3QkJkYVXxH5nmGo4AKTPzht9yqHTj7jx-pCS68Aj0yJxGZmcryReEdREjpq1ibTDJx6Uyd_FZkgWUY9CuFvFwyLNy4F_Uivi2ng8IsawIwJW8JiLtXkbz5vMvWsA0xelcH42HGvGZgqXCnpQK8mV3WpY6YjEXCIJEwMFWiGPv-SjD1ISUGBcl2sACEn-DxzWS5S5dbR9AJI7TknKG5QbrBv4=), 34619338, 0f9eb480f7207cf57060f2f35c0ba137)
 
 # --- KIỂM TRA QUYỀN ---
 def check_auth(uid):
