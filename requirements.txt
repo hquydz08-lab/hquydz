@@ -1,6 +1,2 @@
-requests
-urllib3
-colorama
-pystyle
+telethon
 flask
-zlapi
