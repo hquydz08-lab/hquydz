@@ -3,24 +3,25 @@ from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from flask import Flask
 
-# ===== CẤU HÌNH HỆ THỐNG (ĐÃ DÁN TOKEN) =====
+# ===== CẤU HÌNH HỆ THỐNG =====
 API_ID = 34619338
 API_HASH = "0f9eb480f7207cf57060f2f35c0ba137"
 BOSS_ID = 7153197678 
 
-# 1. String Session cũ của ông
+# String Session cũ của ông (Đã thêm dấu ngoặc kép để fix SyntaxError)
 SESSION_STR = "1BVtsOL0Bu4qv-2Kt7PD7f4XQKW22mcgaZTh56Xr6uLc4qAX-eJWivCgQfMNhmQmAxNN5_uxEobvPj5se_yT4a9wSY4TgwSjAkYp1MwrLMPn8y04m3tKwmrCkouFBDrR7vihqk4-ZCg6kKzJaAkYu4Z960SdBK7DNzoRMXCFrMTxi80pqi0OK95BBjcto5w0WVNH1XJikycoNa7bmNPYrXMQyRx3QkJkyVXxh5nmGo4AKTPzht9yqHTj7jx-pCS68Aj0yJxGZmcryReEdRejpq1ibTDJx6Uyd_FZkgWUY9CuFvFwyLNy4F_Uivi2ng8IsawIwJW8JiLTXkbz5vMvWsA0xelch42HGvGZgqXCnpQK8mV3WPy6YjEXCIJEwMFWiGPv-SjD1ISUGBcl2sACEn-DxzWS5S5dbR9AJI7TknkG5QbrBv4="
 
-# 2. Token Bot War của ông (Đã dán)
+# Token Bot War của ông
 BOT_TOKEN = "8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4"
 
-# --- TỰ FIX LỖI PADDING ĐỂ KHÔNG BỊ SẬP RENDER ---
+# --- TỰ FIX LỖI PADDING (SỬA LỖI ẢNH 3, 5, 7) ---
 if SESSION_STR:
+    SESSION_STR = SESSION_STR.strip()
     missing_padding = len(SESSION_STR) % 4
     if missing_padding:
         SESSION_STR += '=' * (4 - missing_padding)
 
-# --- BỘ NGÔN 500 DÒNG (MỖI CÂU 1 TIN NHẮN) ---
+# --- BỘ NGÔN 500 DÒNG ---
 NGON_NHAY = ["cn choa ei=))=))=))", "m chay anh cmnr=))=))=))", "đứng lại cho bố=))", "go di m=))", "sao im r con cho=))"] * 100
 NGON_NHAYTAG = ["mẹ m bị t cho ăn gậy vào mồm à con súc vật=))", "sao r con chó mồ côi eii=))", "cay r à con chó=))", "sủa tiếp đi m=))"] * 125
 
@@ -49,8 +50,8 @@ def check_auth(uid):
         if expiry == "vinhvien" or (isinstance(expiry, (int, float)) and time.time() < expiry): return True
     return False
 
-# --- MENU CHÍNH & BẢNG GIÁ BÁN HÀNG ---
-@client.on(events.NewMessage(pattern=r'^/menu$'))
+# --- MENU CHÍNH & BẢNG GIÁ KEY ---
+@client.on(events.NewMessage(pattern=r'^/menu$|^/start$'))
 async def cmd_menu(e):
     if check_auth(e.sender_id):
         await e.reply("""✨ ────────────────────────── ✨
@@ -92,7 +93,7 @@ ADMIN:HQUY""")
 📝 Nhập key: /nhapkey <mã_key>
 👑 Mua key tại: @hquycute""")
 
-# --- LOGIC SPAM 500 DÒNG (FIX MỖI CÂU 1 DÒNG) ---
+# --- LOGIC SPAM 500 DÒNG ---
 @client.on(events.NewMessage(pattern=r'^/nhay$'))
 async def cmd_nhay(e):
     if not check_auth(e.sender_id): return
@@ -115,6 +116,6 @@ app = Flask(__name__)
 def h(): return "Bot HQUY Online"
 threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080), daemon=True).start()
 
-# Khởi động Bot War với Token đã dán
+# Chạy bot
 client.start(bot_token=BOT_TOKEN)
 client.run_until_disconnected()
