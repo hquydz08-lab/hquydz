@@ -1,4 +1,4 @@
-import os, random, asyncio, threading, json, time, base64
+import os, random, asyncio, threading, json, time
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from flask import Flask
@@ -8,24 +8,24 @@ API_ID = 34619338
 API_HASH = "0f9eb480f7207cf57060f2f35c0ba137"
 BOSS_ID = 7153197678 
 
-# 1. Dán String Session vào giữa dấu "" (Đảm bảo không mất chữ StringSession ở đầu)
-SESSION_STR = "1BVtsOL0Bu4qv-2Kt7PD7f4XQKW22mcgaZTh56Xr6uLc4qAX-eJWivCgQfMNhmQmAxNN5_uxEobvPj5se_yT4a9wSY4TgwSjAkYp1MwrLMPn8y04m3tKwmrCkouFBDrR7vihqk4-ZCg6kKzJaAkYu4Z960SdBK7DNzoRMXCFrMTxi80pqi0OK95BBjcto5w0WVNH1XJikycoNa7bmNPYrXMQyRx3QkJkyVXxh5nmGo4AKTPzht9yqHTj7jx-pCS68Aj0yJxGZmcryReEdRejpq1ibTDJx6Uyd_FZkgWUY9CuFvFwyLNy4F_Uivi2ng8IsawIwJW8JiLTXkbz5vMvWsA0xelch42HGvGZgqXCnpQK8mV3WPy6YjEXCIJEwMFWiGPv-SjD1ISUGBcl2sACEn-DxzWS5S5dbR9AJI7TknkG5QbrBv4="
+# 1. String Session MỚI của ông (Đã bao bọc bằng dấu ngoặc kép)
+SESSION_STR = "1BVtsOL0Buxx2VVdubrOn5Gwh3ZO9MWJ8BQuolTkymPcDyFnwCGYUeHUu2UdLabIVwjf_rizS42f8bMUd9NxAgL75n2Nqjssyjd1RJBn7_sYjoZMFSnOE19RMUau8-cjpOftvCUgmlK7X2SLoMi0jqrPNlPCvqF2imKuz5TcZrBbgOpFy5Rz4sYQshpds3xK6-0-eDTkEjz8hPbjRhixob_XUSTWQjQ8Sdk-XcSb-RgfCNQPF6RbLJ3gTMzJR9GRUmlN3RkLi-mfy-3obJWKz1rFayRESpDfGOF64dCiqWgPGxZLqcF047zZdnqMueLcXA_A8yT8Up2UgE5FPocxVufdEMdohedA="
 
-# 2. Token Bot War của ông (Đã dán sẵn)
+# 2. Token Bot War của ông
 BOT_TOKEN = "8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4"
 
-# --- HÀM XỬ LÝ LỖI PADDING THẦN THÁNH (SỬA LỖI ẢNH LOG ÔNG GỬI) ---
+# --- HÀM TỰ ĐỘNG BÙ PADDING (FIX LỖI RENDER SẬP) ---
 def fix_padding(s):
     s = s.strip()
-    return s + "=" * (-len(s) % 4)
+    missing_padding = len(s) % 4
+    if missing_padding:
+        s += '=' * (4 - missing_padding)
+    return s
 
-try:
-    fixed_session = fix_padding(SESSION_STR)
-    client = TelegramClient(StringSession(fixed_session), API_ID, API_HASH)
-except Exception as e:
-    print(f"Lỗi khởi tạo: {e}")
+# --- KHỞI TẠO CLIENT ---
+client = TelegramClient(StringSession(fix_padding(SESSION_STR)), API_ID, API_HASH)
 
-# --- BỘ NGÔN 500 DÒNG (MỖI CÂU 1 TIN NHẮN) ---
+# --- BỘ NGÔN 500 DÒNG ---
 NGON_NHAY = ["cn choa ei=))=))=))", "m chay anh cmnr=))=))=))", "đứng lại cho bố=))", "go di m=))", "sao im r con cho=))"] * 100
 NGON_NHAYTAG = ["mẹ m bị t cho ăn gậy vào mồm à con súc vật=))", "sao r con chó mồ côi eii=))", "cay r à con chó=))", "sủa tiếp đi m=))"] * 125
 
@@ -52,7 +52,7 @@ def check_auth(uid):
         if expiry == "vinhvien" or (isinstance(expiry, (int, float)) and time.time() < expiry): return True
     return False
 
-# --- MENU CHÍNH & BẢNG GIÁ ---
+# --- MENU CHÍNH & BẢNG GIÁ KEY (KHI NGƯỜI LẠ START) ---
 @client.on(events.NewMessage(pattern=r'^/menu$|^/start$'))
 async def cmd_menu(e):
     if check_auth(e.sender_id):
@@ -95,7 +95,7 @@ ADMIN:HQUY""")
 📝 Nhập key: /nhapkey <mã_key>
 👑 Mua key tại: @hquycute""")
 
-# --- LOGIC SPAM ---
+# --- LOGIC SPAM 500 DÒNG ---
 @client.on(events.NewMessage(pattern=r'^/nhay$'))
 async def cmd_nhay(e):
     if not check_auth(e.sender_id): return
@@ -119,5 +119,6 @@ def h(): return "Bot HQUY Online"
 threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080), daemon=True).start()
 
 # Khởi động Bot
+print("🚀 Bot đang lên sóng...")
 client.start(bot_token=BOT_TOKEN)
 client.run_until_disconnected()
