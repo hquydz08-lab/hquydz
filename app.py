@@ -231,10 +231,17 @@ async def auto_del(e):
         except: pass
 
 # Flask Server 24/7 duy trì
+# Flask Server để giữ bot sống trên Render
 app = Flask(__name__)
 @app.route('/')
-def h(): return "Bot HQUY Running"
-threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080), daemon=True).start()
+def h(): return "Bot HQUY Online"
+
+def run_flask():
+    # Render tự cấp PORT qua môi trường, nếu không có thì dùng 10000
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+threading.Thread(target=run_flask, daemon=True).start()
 
 client.start()
 client.run_until_disconnected()
