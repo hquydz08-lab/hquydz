@@ -10,7 +10,7 @@ API_HASH = "0f9eb480f7207cf57060f2f35c0ba137"
 BOSS_ID = 7153197678
 BOT_TOKEN = "8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4"
 # LẤY SESSION MỚI DÁN VÀO ĐÂY ĐỂ TRÁNH LỖI 275 BYTES
-SESSION_STR = "DÁN_SESSION_MỚI_VÀO_ĐÂY" 
+SESSION_STR = "1BVtsOL0Bu58Jr7-lsWHDO3waK6zC3u_f2_fOBnBR7jWd9litQGbKTvcwAFdSKWCx5WZYSdgittvv7qAS8EbarEuyFEUn_nx7H-hCCy1n8x22F9Ar9nmgMrgnCYHrfiKp6FufesRoLsmwxWskmN82h1YSrEl_xQXamc8JkrRUv22MPC385FT6UIlt9KkO1c3pFBHITY9fgipaFAPg8FSB66pcZ-Uv-2MIcupeVYOBzDRUxU6NB9VTF9dCXnSXgPCliCNxfiLvrhCYWMG6U8S110YP98pH1_GRl7VcZ6ZmunHPBRZAB5lCFPg6pn_jSpLVpVEBmOri-sq1gCp57bRsefmh_eRE73E=" 
 
 # --- BỘ NGÔN 1000 DÒNG ---
 NGON_1000 = ["đmm sủa tiếp đi con chó", "mồ côi thì im mồm", "cay à con cún", "sao im r con súc vật", "mẹ m bị t cho ăn gậy vào mồm à"] * 200
