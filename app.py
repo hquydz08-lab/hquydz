@@ -1,59 +1,67 @@
 import os, asyncio, threading, time, json, random
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-from datetime import datetime, timedelta
+from gtts import gTTS
 from flask import Flask
 
 # ===== CẤU HÌNH =====
 API_ID = 34619338
 API_HASH = "0f9eb480f7207cf57060f2f35c0ba137"
-BOSS_ID = 7153197678 
+BOSS_ID = 7153197678
 BOT_TOKEN = "8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4"
-SESSION_STR = "1BVtsOL0Bu58Jr7-lsWHDO3waK6zC3u_f2_fOBnBR7jWd9litQGbKTvcwAFdSKWCx5WZYSdgittvv7qAS8EbarEuyFEUn_nx7H-hCCy1n8x22F9Ar9nmgMrgnCYHrfiKp6FufesRoLsmwxWskmN82h1YSrEl_xQXamc8JkrRUv22MPC385FT6UIlt9KkO1c3pFBHITY9fgipaFAPg8FSB66pcZ-Uv-2MIcupeVYOBzDRUxU6NB9VTF9dCXnSXgPCliCNxfiLvrhCYWMG6U8S110YP98pH1_GRl7VcZ6ZmunHPBRZAB5lCFPg6pn_jSpLVpVEBmOri-sq1gCp57bRsefmh_eRE73E="
+# LẤY SESSION MỚI DÁN VÀO ĐÂY ĐỂ TRÁNH LỖI 275 BYTES
+SESSION_STR = "DÁN_SESSION_MỚI_VÀO_ĐÂY" 
 
-# Quản lý dữ liệu Key
-# data["users"] giờ sẽ lưu: {"ID_USER": "Ngày_Hết_Hạn"}
-data = {"users": {}, "keys": {}, "admins": [7153197678], "delay": 0.5}
-tasks = {"spam": {}}
+# --- BỘ NGÔN 1000 DÒNG ---
+NGON_1000 = ["đmm sủa tiếp đi con chó", "mồ côi thì im mồm", "cay à con cún", "sao im r con súc vật", "mẹ m bị t cho ăn gậy vào mồm à"] * 200
+NGON_500 = NGON_1000[:500]
 
-client = TelegramClient(StringSession(SESSION_STR), API_ID, API_HASH)
+db = {"users": {}, "keys": {}, "admins": [7153197678], "delay": 0.5}
+tasks = {"spam": {}, "anti": {}}
 
-# --- MENU & BẢNG GIÁ HÀNG DỌC ---
-BANG_GIA = """📣 BẢNG GIÁ KEY REX SPAM
-──────────────────────────
-🎫 KEY NGÀY: 2.000 VNĐ
-🎫 KEY TUẦN: 10.000 VNĐ
-🎫 KEY THÁNG: 30.000 VNĐ
-🎫 VĨNH VIỄN: 70.000 VNĐ
-──────────────────────────
-👑 Mua tại: @hquycute
+client = TelegramClient(StringSession(SESSION_STR.strip()), API_ID, API_HASH)
+
+# --- GIAO DIỆN BẢNG GIÁ (NGƯỜI LẠ) ---
+BANG_GIA = """📣 𝗫𝗔𝗖 𝗧𝗛𝗨𝗖 𝗡𝗚𝗨𝗢𝗜 𝗗𝗨𝗡𝗚
+━━━━━━━━━━━━━━━━━━
+💰 𝗕𝗔𝗡𝗚 𝗚𝗜𝗔
+━━━━━━━━━━━━━━━━━━
+🎫 2K/DAY | 10K/WEEK
+🎫 20K/MONTH | 70K/VV
+━━━━━━━━━━━━━━━━━━
+🔑 Vui lòng nhập key để sử dụng bot
+📝 /nhapkey <key>
+━━━━━━━━━━━━━━━━━━
+👑 ADMIN: @hquycute
 ADMIN:HQUY"""
 
+# --- MENU VIP (ĐÚNG MẪU ÔNG GỬI) ---
 MENU_VIP = """✨ ────────────────────────── ✨
 Rex Spam Sieu Vip Pro Max 🦖
 ✨ ────────────────────────── ✨
 👤 OWNER: Hai Quy ⚡️ 
 🛡 Ho Tro: Tele:@hquycute
+🚀 QUYỀN HẠN: Hệ Thống Key Vô Hạn 
 
 🔥 DANH SÁCH MENU
-🤬 /nhay - Trêu nhây
-🤬 /nhaytag - Nhây tag chửi
+🤬 /sp - Trêu nhây 
+🤬 /spnd - spam + nội dung 
 📞 /call - Spam Call + ID
 ⚡ /setdelay - Chỉnh tốc độ
 🚫 /anti - Tự xóa tin đối thủ
 ✅ /unanti - Ngừng xóa tin
 ➕ /addadm - Thêm quản trị viên
 ➖ /xoadm - Xóa quản trị viên
-📜 /listadm - Danh sách admin
-🔑 /newkey - Tạo key (Tên + Time)
+📜 /listadm - Xem danh sách admin
+🔑 /newkey - Tạo key hệ thống
 🔑 /nhapkey - Kích hoạt key
-❌ /xoakey - Xóa key
+❌ /xoakey - Xoa key
 👑 /xoaall - Xoá sạch spam
 👻 /info - Check ID người dùng
-💎 /voice - Văn bản sang Voice
-🛑 /stop - SPAM OFF
-🔴 /stopxoa - Dừng xoá tin bot
-🚀 /start - Khởi động lại bot
+💎 /voice - Chuyển sang Voice
+🛑 /stop - Dừng tất cả (SPAM OFF)
+🔴 /stopxoa - Dừng xóa bot
+🚀 /start - Khởi động bot
 ✨ ────────────────────────── ✨
 ADMIN:HQUY"""
 
@@ -63,72 +71,76 @@ async def main_handler(e):
     args = e.text.split()
     cmd = args[0].lower()
     uid = e.sender_id
-    
-    # Kiểm tra hạn dùng
-    now = datetime.now()
-    is_vip = False
-    if uid == BOSS_ID or uid in data["admins"]:
-        is_vip = True
-    elif str(uid) in data["users"]:
-        expiry = datetime.strptime(data["users"][str(uid)], "%Y-%m-%d %H:%M:%S")
-        if now < expiry:
-            is_vip = True
-        else:
-            del data["users"][str(uid)] # Hết hạn thì xóa
+    is_vip = (uid == BOSS_ID or uid in db["admins"] or str(uid) in db["users"])
 
-    # 1. LỆNH CÔNG KHAI
+    # 1. Start & Menu
     if cmd == '/start':
         await e.reply(MENU_VIP if is_vip else BANG_GIA)
         return
 
-    if cmd == '/nhapkey':
-        if len(args) < 2: return await e.reply("⚠️ Nhập: `/nhapkey TÊN-KEY`")
-        key_name = args[1]
-        if key_name in data["keys"]:
-            days = data["keys"][key_name]
-            expiry_date = now + timedelta(days=days)
-            data["users"][str(uid)] = expiry_date.strftime("%Y-%m-%d %H:%M:%S")
-            del data["keys"][key_name]
-            await e.reply(f"✅ VIP ACTIVE!\nHạn dùng đến: {data['users'][str(uid)]}\nADMIN:HQUY")
-        else: await e.reply("❌ Key sai hoặc đã dùng!")
+    # 2. Xử lý nhập key công khai
+    if cmd == '/nhapkey' and len(args) > 1:
+        if args[1] in db["keys"]:
+            db["users"][str(uid)] = "active"
+            del db["keys"][args[1]]
+            await e.reply("✅ VIP ACTIVE!\nADMIN:HQUY")
+        else: await e.reply("❌ Key không tồn tại!")
         return
 
-    # 2. LỆNH CHO ADMIN / BOSS
+    # 3. Tất cả lệnh VIP (Chỉ VIP mới dùng được)
     if is_vip:
-        # Cấu trúc: /newkey [tên] [thời gian: day/week/month/forever]
-        if cmd == '/newkey' and uid == BOSS_ID:
-            if len(args) < 3:
-                return await e.reply("⚠️ Cú pháp: `/newkey [tên] [day/week/month/forever]`")
-            
-            name = args[1]
-            duration = args[2].lower()
-            days = 0
-            
-            if duration == 'day': days = 1
-            elif duration == 'week': days = 7
-            elif duration == 'month': days = 30
-            elif duration == 'forever': days = 36500
-            else: return await e.reply("❌ Thời gian không hợp lệ (day/week/month/forever)")
-            
-            data["keys"][name] = days
-            await e.reply(f"🔑 ĐÃ TẠO KEY:\n🏷 Tên: `{name}`\n⏰ Hạn: {duration}\nADMIN:HQUY")
+        # Spam nội dung bất kỳ
+        if cmd == '/spnd' and len(args) > 1:
+            nd = e.text.replace(args[0], '').strip()
+            tasks["spam"][e.chat_id] = True
+            while tasks["spam"].get(e.chat_id):
+                await client.send_message(e.chat_id, nd)
+                await asyncio.sleep(db["delay"])
 
+        # Spam trêu nhây tag ID
+        elif cmd == '/sp' and len(args) > 1:
+            target = args[1]
+            tasks["spam"][e.chat_id] = True
+            for line in NGON_500:
+                if not tasks["spam"].get(e.chat_id): break
+                await client.send_message(e.chat_id, f"{line} [{target}](tg://user?id={target})")
+                await asyncio.sleep(db["delay"])
+
+        # Chuyển văn bản sang Voice
+        elif cmd == '/voice' and len(args) > 1:
+            text = e.text.replace(args[0], '').strip()
+            try:
+                gTTS(text, lang='vi').save("v.mp3")
+                await client.send_file(e.chat_id, "v.mp3", voice_note=True)
+                os.remove("v.mp3")
+            except: await e.reply("❌ Lỗi Voice!")
+
+        # Check ID (Reply tin nhắn hoặc tag)
         elif cmd == '/info':
-            target = (await e.get_reply_message()).sender_id if e.is_reply else uid
-            await e.reply(f"👻 ID: `{target}`\nADMIN:HQUY")
+            user = (await e.get_reply_message()).sender_id if e.is_reply else uid
+            await e.reply(f"👻 ID: `{user}`\nADMIN:HQUY")
 
+        # Quản lý Key
+        elif cmd == '/newkey' and uid == BOSS_ID:
+            k = args[1] if len(args) > 1 else str(random.randint(1000,9999))
+            db["keys"][k] = True
+            await e.reply(f"🔑 Key: `{k}`\nADMIN:HQUY")
+
+        # Tốc độ
+        elif cmd == '/setdelay' and len(args) > 1:
+            db["delay"] = float(args[1])
+            await e.reply(f"⚡ Delay: {db['delay']}s")
+
+        # Dừng tất cả
         elif cmd == '/stop':
             tasks["spam"][e.chat_id] = False
             await e.reply("🛑 **SPAM OFF**\nADMIN:HQUY")
 
-        elif cmd == '/nhay':
-            tasks["spam"][e.chat_id] = True
-            await e.reply("🚀 BẮT ĐẦU...")
-            while tasks["spam"].get(e.chat_id):
-                await client.send_message(e.chat_id, "đmm sủa tiếp đi con chó mồ côi=))")
-                await asyncio.sleep(data["delay"])
+        # Danh sách admin
+        elif cmd == '/listadm':
+            await e.reply(f"📜 Admin List: `{db['admins']}`")
 
-# Flask
+# Flask duy trì Render
 app = Flask(__name__)
 @app.route('/')
 def h(): return "Bot Live"
