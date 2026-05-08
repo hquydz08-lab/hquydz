@@ -1,6 +1,7 @@
 import os, asyncio, threading, time, json, random
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
+from datetime import datetime, timedelta
 from flask import Flask
 
 # ===== CẤU HÌNH =====
@@ -10,13 +11,14 @@ BOSS_ID = 7153197678
 BOT_TOKEN = "8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4"
 SESSION_STR = "1BVtsOL0Bu58Jr7-lsWHDO3waK6zC3u_f2_fOBnBR7jWd9litQGbKTvcwAFdSKWCx5WZYSdgittvv7qAS8EbarEuyFEUn_nx7H-hCCy1n8x22F9Ar9nmgMrgnCYHrfiKp6FufesRoLsmwxWskmN82h1YSrEl_xQXamc8JkrRUv22MPC385FT6UIlt9KkO1c3pFBHITY9fgipaFAPg8FSB66pcZ-Uv-2MIcupeVYOBzDRUxU6NB9VTF9dCXnSXgPCliCNxfiLvrhCYWMG6U8S110YP98pH1_GRl7VcZ6ZmunHPBRZAB5lCFPg6pn_jSpLVpVEBmOri-sq1gCp57bRsefmh_eRE73E="
 
-# Quản lý dữ liệu (Lưu tạm thời)
-data = {"users": [], "keys": {}, "admins": [7153197678], "delay": 0.5}
-tasks = {"spam": {}, "anti": {}}
+# Quản lý dữ liệu Key
+# data["users"] giờ sẽ lưu: {"ID_USER": "Ngày_Hết_Hạn"}
+data = {"users": {}, "keys": {}, "admins": [7153197678], "delay": 0.5}
+tasks = {"spam": {}}
 
 client = TelegramClient(StringSession(SESSION_STR), API_ID, API_HASH)
 
-# --- BẢNG GIÁ HÀNG DỌC ---
+# --- MENU & BẢNG GIÁ HÀNG DỌC ---
 BANG_GIA = """📣 BẢNG GIÁ KEY REX SPAM
 ──────────────────────────
 🎫 KEY NGÀY: 2.000 VNĐ
@@ -27,7 +29,6 @@ BANG_GIA = """📣 BẢNG GIÁ KEY REX SPAM
 👑 Mua tại: @hquycute
 ADMIN:HQUY"""
 
-# --- MENU VIP HÀNG DỌC ---
 MENU_VIP = """✨ ────────────────────────── ✨
 Rex Spam Sieu Vip Pro Max 🦖
 ✨ ────────────────────────── ✨
@@ -44,7 +45,7 @@ Rex Spam Sieu Vip Pro Max 🦖
 ➕ /addadm - Thêm quản trị viên
 ➖ /xoadm - Xóa quản trị viên
 📜 /listadm - Danh sách admin
-🔑 /newkey - Tạo key hệ thống
+🔑 /newkey - Tạo key (Tên + Time)
 🔑 /nhapkey - Kích hoạt key
 ❌ /xoakey - Xóa key
 👑 /xoaall - Xoá sạch spam
@@ -62,66 +63,70 @@ async def main_handler(e):
     args = e.text.split()
     cmd = args[0].lower()
     uid = e.sender_id
-    is_vip = (uid == BOSS_ID or uid in data["admins"] or str(uid) in data["users"])
+    
+    # Kiểm tra hạn dùng
+    now = datetime.now()
+    is_vip = False
+    if uid == BOSS_ID or uid in data["admins"]:
+        is_vip = True
+    elif str(uid) in data["users"]:
+        expiry = datetime.strptime(data["users"][str(uid)], "%Y-%m-%d %H:%M:%S")
+        if now < expiry:
+            is_vip = True
+        else:
+            del data["users"][str(uid)] # Hết hạn thì xóa
 
-    # 1. Start & Menu
+    # 1. LỆNH CÔNG KHAI
     if cmd == '/start':
         await e.reply(MENU_VIP if is_vip else BANG_GIA)
         return
-    if cmd == '/menu' and is_vip:
-        await e.reply(MENU_VIP)
+
+    if cmd == '/nhapkey':
+        if len(args) < 2: return await e.reply("⚠️ Nhập: `/nhapkey TÊN-KEY`")
+        key_name = args[1]
+        if key_name in data["keys"]:
+            days = data["keys"][key_name]
+            expiry_date = now + timedelta(days=days)
+            data["users"][str(uid)] = expiry_date.strftime("%Y-%m-%d %H:%M:%S")
+            del data["keys"][key_name]
+            await e.reply(f"✅ VIP ACTIVE!\nHạn dùng đến: {data['users'][str(uid)]}\nADMIN:HQUY")
+        else: await e.reply("❌ Key sai hoặc đã dùng!")
         return
 
-    # 2. Các lệnh hệ thống (Chỉ Boss/Admin)
+    # 2. LỆNH CHO ADMIN / BOSS
     if is_vip:
+        # Cấu trúc: /newkey [tên] [thời gian: day/week/month/forever]
         if cmd == '/newkey' and uid == BOSS_ID:
-            k = f"REX-{random.randint(1000,9999)}"
-            data["keys"][k] = True
-            await e.reply(f"🔑 KEY MỚI: `{k}`\nADMIN:HQUY")
-        
-        elif cmd == '/nhapkey':
-            k = args[1] if len(args) > 1 else ""
-            if k in data["keys"]:
-                data["users"].append(str(uid))
-                del data["keys"][k]
-                await e.reply("✅ KÍCH HOẠT VIP THÀNH CÔNG!\nADMIN:HQUY")
-            else: await e.reply("❌ Key không tồn tại!")
-
-        elif cmd == '/listadm':
-            await e.reply(f"📜 Danh sách Admin: `{data['admins']}`\nADMIN:HQUY")
+            if len(args) < 3:
+                return await e.reply("⚠️ Cú pháp: `/newkey [tên] [day/week/month/forever]`")
+            
+            name = args[1]
+            duration = args[2].lower()
+            days = 0
+            
+            if duration == 'day': days = 1
+            elif duration == 'week': days = 7
+            elif duration == 'month': days = 30
+            elif duration == 'forever': days = 36500
+            else: return await e.reply("❌ Thời gian không hợp lệ (day/week/month/forever)")
+            
+            data["keys"][name] = days
+            await e.reply(f"🔑 ĐÃ TẠO KEY:\n🏷 Tên: `{name}`\n⏰ Hạn: {duration}\nADMIN:HQUY")
 
         elif cmd == '/info':
             target = (await e.get_reply_message()).sender_id if e.is_reply else uid
-            await e.reply(f"👻 ID của đối tượng: `{target}`\nADMIN:HQUY")
-
-        elif cmd == '/xoaall':
-            await e.reply("👑 Đang xoá sạch tin nhắn spam...")
-            # Logic xóa (tùy quyền admin group)
-
-        elif cmd == '/xoakey' and uid == BOSS_ID:
-            data["keys"] = {}
-            await e.reply("❌ Đã xoá sạch kho key hệ thống!\nADMIN:HQUY")
-
-        elif cmd == '/voice':
-            await e.reply("💎 Tính năng Voice đang được bảo trì!\nADMIN:HQUY")
-
-        elif cmd == '/addadm' and uid == BOSS_ID:
-            new_adm = int(args[1]) if len(args) > 1 else None
-            if new_adm:
-                data["admins"].append(new_adm)
-                await e.reply(f"➕ Đã thêm `{new_adm}` làm Admin.")
-
-        # Lệnh Spam
-        elif cmd == '/nhay' or cmd == '/nhaytag':
-            tasks["spam"][e.chat_id] = True
-            await e.reply("🚀 BẮT ĐẦU NHÂY...")
-            while tasks["spam"].get(e.chat_id):
-                await client.send_message(e.chat_id, "đmm sủa tiếp đi con chó mồ côi=))")
-                await asyncio.sleep(data["delay"])
+            await e.reply(f"👻 ID: `{target}`\nADMIN:HQUY")
 
         elif cmd == '/stop':
             tasks["spam"][e.chat_id] = False
             await e.reply("🛑 **SPAM OFF**\nADMIN:HQUY")
+
+        elif cmd == '/nhay':
+            tasks["spam"][e.chat_id] = True
+            await e.reply("🚀 BẮT ĐẦU...")
+            while tasks["spam"].get(e.chat_id):
+                await client.send_message(e.chat_id, "đmm sủa tiếp đi con chó mồ côi=))")
+                await asyncio.sleep(data["delay"])
 
 # Flask
 app = Flask(__name__)
