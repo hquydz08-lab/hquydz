@@ -9,8 +9,7 @@ API_ID = 34619338
 API_HASH = "0f9eb480f7207cf57060f2f35c0ba137"
 BOSS_ID = 7153197678
 BOT_TOKEN = "8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4"
-# LẤY SESSION MỚI DÁN VÀO ĐÂY ĐỂ TRÁNH LỖI 275 BYTES
-SESSION_STR = "1BVtsOL0Bu58Jr7-lsWHDO3waK6zC3u_f2_fOBnBR7jWd9litQGbKTvcwAFdSKWCx5WZYSdgittvv7qAS8EbarEuyFEUn_nx7H-hCCy1n8x22F9Ar9nmgMrgnCYHrfiKp6FufesRoLsmwxWskmN82h1YSrEl_xQXamc8JkrRUv22MPC385FT6UIlt9KkO1c3pFBHITY9fgipaFAPg8FSB66pcZ-Uv-2MIcupeVYOBzDRUxU6NB9VTF9dCXnSXgPCliCNxfiLvrhCYWMG6U8S110YP98pH1_GRl7VcZ6ZmunHPBRZAB5lCFPg6pn_jSpLVpVEBmOri-sq1gCp57bRsefmh_eRE73E=" 
+SESSION_STR = "1BVtsOL0BuxqW2IARcbqCT-8hxCtwMS3cNSRFvKTdWRD4J0B54iss_sM2bNqcnUkHRkbtKflVVhbWcMoDrIStGFXjZZomp7QdlVwI74Q-Cf2OBJGZOZatvpGtZWVcX69iRJBfyPq0t5-zKMJgLCeDdrUnJIfYL6CFRzSrMb-Qrje87_1IRZH_KoWhj5PSoOJZCjPZWRH3rONJQxp5b1MSDyNEIH7iA2RBzG-ME1gQEbA9txIEGPVrEymLlyIGp4kV8p1GZWtbDKp7MXAlHcCwIgjlmeRlYaDg0TFDujHDJuCh7uc-5X8xbbrOUKmNWLvj7TuTqBhBzLwJxB21TLAym4xG9dlLJSc=" 
 
 # --- BỘ NGÔN 1000 DÒNG ---
 NGON_1000 = ["đmm sủa tiếp đi con chó", "mồ côi thì im mồm", "cay à con cún", "sao im r con súc vật", "mẹ m bị t cho ăn gậy vào mồm à"] * 200
@@ -21,7 +20,7 @@ tasks = {"spam": {}, "anti": {}}
 
 client = TelegramClient(StringSession(SESSION_STR.strip()), API_ID, API_HASH)
 
-# --- GIAO DIỆN BẢNG GIÁ (NGƯỜI LẠ) ---
+# --- GIAO DIỆN BẢNG GIÁ (HIỆN KHI /START HOẶC /NHAPKEY TRỐNG) ---
 BANG_GIA = """📣 𝗫𝗔𝗖 𝗧𝗛𝗨𝗖 𝗡𝗚𝗨𝗢𝗜 𝗗𝗨𝗡𝗚
 ━━━━━━━━━━━━━━━━━━
 💰 𝗕𝗔𝗡𝗚 𝗚𝗜𝗔
@@ -35,7 +34,7 @@ BANG_GIA = """📣 𝗫𝗔𝗖 𝗧𝗛𝗨𝗖 𝗡𝗚𝗨𝗢𝗜 𝗗𝗨�
 👑 ADMIN: @hquycute
 ADMIN:HQUY"""
 
-# --- MENU VIP (ĐÚNG MẪU ÔNG GỬI) ---
+# --- MENU VIP CHUẨN ---
 MENU_VIP = """✨ ────────────────────────── ✨
 Rex Spam Sieu Vip Pro Max 🦖
 ✨ ────────────────────────── ✨
@@ -55,7 +54,7 @@ Rex Spam Sieu Vip Pro Max 🦖
 📜 /listadm - Xem danh sách admin
 🔑 /newkey - Tạo key hệ thống
 🔑 /nhapkey - Kích hoạt key
-❌ /xoakey - Xoa key
+❌ /xoakey - Xóa key
 👑 /xoaall - Xoá sạch spam
 👻 /info - Check ID người dùng
 💎 /voice - Chuyển sang Voice
@@ -73,23 +72,21 @@ async def main_handler(e):
     uid = e.sender_id
     is_vip = (uid == BOSS_ID or uid in db["admins"] or str(uid) in db["users"])
 
-    # 1. Start & Menu
-    if cmd == '/start':
+    # 1. Start & Nhapkey trống
+    if cmd == '/start' or (cmd == '/nhapkey' and len(args) < 2):
         await e.reply(MENU_VIP if is_vip else BANG_GIA)
         return
 
-    # 2. Xử lý nhập key công khai
-    if cmd == '/nhapkey' and len(args) > 1:
+    # 2. Nhập key có mã
+    if cmd == '/nhapkey' and len(args) >= 2:
         if args[1] in db["keys"]:
             db["users"][str(uid)] = "active"
-            del db["keys"][args[1]]
             await e.reply("✅ VIP ACTIVE!\nADMIN:HQUY")
         else: await e.reply("❌ Key không tồn tại!")
         return
 
-    # 3. Tất cả lệnh VIP (Chỉ VIP mới dùng được)
+    # 3. Lệnh VIP
     if is_vip:
-        # Spam nội dung bất kỳ
         if cmd == '/spnd' and len(args) > 1:
             nd = e.text.replace(args[0], '').strip()
             tasks["spam"][e.chat_id] = True
@@ -97,7 +94,6 @@ async def main_handler(e):
                 await client.send_message(e.chat_id, nd)
                 await asyncio.sleep(db["delay"])
 
-        # Spam trêu nhây tag ID
         elif cmd == '/sp' and len(args) > 1:
             target = args[1]
             tasks["spam"][e.chat_id] = True
@@ -106,39 +102,24 @@ async def main_handler(e):
                 await client.send_message(e.chat_id, f"{line} [{target}](tg://user?id={target})")
                 await asyncio.sleep(db["delay"])
 
-        # Chuyển văn bản sang Voice
         elif cmd == '/voice' and len(args) > 1:
             text = e.text.replace(args[0], '').strip()
-            try:
-                gTTS(text, lang='vi').save("v.mp3")
-                await client.send_file(e.chat_id, "v.mp3", voice_note=True)
-                os.remove("v.mp3")
-            except: await e.reply("❌ Lỗi Voice!")
+            gTTS(text, lang='vi').save("v.mp3")
+            await client.send_file(e.chat_id, "v.mp3", voice_note=True)
+            os.remove("v.mp3")
 
-        # Check ID (Reply tin nhắn hoặc tag)
-        elif cmd == '/info':
-            user = (await e.get_reply_message()).sender_id if e.is_reply else uid
-            await e.reply(f"👻 ID: `{user}`\nADMIN:HQUY")
-
-        # Quản lý Key
-        elif cmd == '/newkey' and uid == BOSS_ID:
-            k = args[1] if len(args) > 1 else str(random.randint(1000,9999))
-            db["keys"][k] = True
-            await e.reply(f"🔑 Key: `{k}`\nADMIN:HQUY")
-
-        # Tốc độ
-        elif cmd == '/setdelay' and len(args) > 1:
-            db["delay"] = float(args[1])
-            await e.reply(f"⚡ Delay: {db['delay']}s")
-
-        # Dừng tất cả
         elif cmd == '/stop':
             tasks["spam"][e.chat_id] = False
             await e.reply("🛑 **SPAM OFF**\nADMIN:HQUY")
 
-        # Danh sách admin
-        elif cmd == '/listadm':
-            await e.reply(f"📜 Admin List: `{db['admins']}`")
+        elif cmd == '/info':
+            user = (await e.get_reply_message()).sender_id if e.is_reply else uid
+            await e.reply(f"👻 ID: `{user}`\nADMIN:HQUY")
+
+        elif cmd == '/newkey' and uid == BOSS_ID:
+            k = args[1] if len(args) > 1 else str(random.randint(1000,9999))
+            db["keys"][k] = True
+            await e.reply(f"🔑 Key: `{k}`\nADMIN:HQUY")
 
 # Flask duy trì Render
 app = Flask(__name__)
