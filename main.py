@@ -1,4 +1,4 @@
-```python
+
 import asyncio, os, random, datetime, edge_tts, re, glob, requests
 from telethon import TelegramClient, events, Button, functions, types
 from telethon.errors import FloodWaitError, RPCError, PremiumAccountRequiredError
