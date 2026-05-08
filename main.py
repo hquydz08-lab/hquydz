@@ -1,4 +1,4 @@
-
+```python
 import asyncio, os, random, datetime, edge_tts, re, glob, requests
 from telethon import TelegramClient, events, Button, functions, types
 from telethon.errors import FloodWaitError, RPCError, PremiumAccountRequiredError
@@ -22,7 +22,7 @@ def _sync():
         except: pass
 _sync()
 
-bot = TelegramClient('bot_manage', A_ID, A_HS).start(bot_token=B_TK)
+bot = TelegramClient('bot_manage_session', A_ID, A_HS).start(bot_token=B_TK)
 o_p, u_c, c_b, c_i, s_t, cl_t, a_r, o_f, w_m = {}, {}, {}, {}, {}, {}, {}, {}, {}
 
 F1, F2 = "bot_users.txt", "banned_users.txt"
@@ -35,7 +35,8 @@ def _sb():
         for u in b_u: f.write(f"{u}\n")
 
 def _su(u):
-    if not os.path.exists(F1): open(F1, "w").close()
+    if not os.path.exists(F1): 
+        with open(F1, "w") as f: pass
     with open(F1, "r") as f: us = f.read().splitlines()
     if str(u) not in us:
         with open(F1, "a") as f: f.write(f"{u}\n")
@@ -81,7 +82,9 @@ M_T = """📣 **XÁC THỰC NGƯỜI DÙNG**
 """
 
 def _logic(c, u_i):
-    def _mk(cid): w_m[f"{u_i}_{cid}"] = datetime.datetime.now(datetime.timezone.utc)
+    # Khai báo các trạng thái cho client này
+    s_t[u_i] = False
+    cl_t[u_i] = False
 
     async def _sd(cid, ct, tid=None):
         s_t[u_i] = True
@@ -91,6 +94,7 @@ def _logic(c, u_i):
             for m in ls:
                 if not s_t.get(u_i): break
                 try:
+                    # Gửi tin nhắn từ acc cá nhân đã login
                     fm = f"{m.strip()} [\u200b](tg://user?id={tid})" if tid else m.strip()
                     await c.send_message(cid, fm, parse_mode='markdown')
                     await asyncio.sleep(0.3)
@@ -110,21 +114,44 @@ def _logic(c, u_i):
 
     @c.on(events.NewMessage(outgoing=True, pattern=r'/sp (\d+)'))
     async def _sp1(e):
-        t = int(e.pattern_match.group(1)); _mk(e.chat_id); await e.delete()
-        if os.path.exists('chui.txt'): await _sd(e.chat_id, open('chui.txt', 'r', encoding='utf-8').readlines(), t)
+        t = int(e.pattern_match.group(1))
+        await e.delete()
+        if os.path.exists('chui.txt'):
+            with open('chui.txt', 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                await _sd(e.chat_id, lines, t)
 
     @c.on(events.NewMessage(outgoing=True, pattern=r'/stop'))
     async def _stp(e):
-        s_t[u_i] = False; cl_t[u_i] = False; await e.edit("🛑 STOP"); await asyncio.sleep(1); await e.delete()
+        s_t[u_i] = False
+        cl_t[u_i] = False
+        await e.edit("🛑 **STOPPED**")
+        await asyncio.sleep(1)
+        await e.delete()
 
     @c.on(events.NewMessage(outgoing=True, pattern=r'/voice (.+)'))
     async def _v(e):
-        t = e.pattern_match.group(1); await e.delete(); p = f"v_{u_i}.mp3"
-        await edge_tts.Communicate(t, "vi-VN-NamMinhNeural", rate="-15%").save(p)
-        await c.send_file(e.chat_id, p, voice_note=True)
+        t = e.pattern_match.group(1)
+        await e.delete()
+        p = f"v_{u_i}.mp3"
+        try:
+            communicate = edge_tts.Communicate(t, "vi-VN-NamMinhNeural", rate="-15%")
+            await communicate.save(p)
+            await c.send_file(e.chat_id, p, voice_note=True)
+        except: pass
         if os.path.exists(p): os.remove(p)
 
-    # ... (Các lệnh khác như fake, cam, clear giữ nguyên logic) ...
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/fake(?:\s+(.+))?'))
+    async def _fk(e):
+        t = e.pattern_match.group(1)
+        try:
+            if t: target = await c.get_entity(int(t) if t.isdigit() else t)
+            elif e.is_reply: target = await c.get_entity((await e.get_reply_message()).sender_id)
+            else: return await e.edit("⚠️ Tag hoặc Reply!")
+            await e.edit("🔄 Đang fake...")
+            await c(functions.account.UpdateProfileRequest(first_name=target.first_name, last_name=target.last_name or ""))
+            await e.edit(f"🎭 Đã fake thành: {target.first_name}")
+        except: await e.edit("❌ Lỗi!")
 
 @bot.on(events.CallbackQuery(data="login"))
 async def _lf(ev):
@@ -132,16 +159,18 @@ async def _lf(ev):
     if u in b_u: return
     async with bot.conversation(u) as cv:
         try:
-            await cv.send_message("SĐT (+84...):")
+            await cv.send_message("📱 **LOGIN ACC CÁ NHÂN**\nNhập SĐT (+84...):")
             p = (await cv.get_response()).text.strip().replace(" ", "")
-            c = TelegramClient(StringSession(), A_ID, A_HS); await c.connect()
+            c = TelegramClient(StringSession(), A_ID, A_HS)
+            await c.connect()
             r = await c.send_code_request(p)
-            await cv.send_message("OTP (Dạng 1.2.3.4.5):")
+            await cv.send_message("📩 Nhập OTP (Dạng 1.2.3.4.5):")
             o = (await cv.get_response()).text.strip().replace(".", "")
             await c.sign_in(p, o, phone_code_hash=r.phone_code_hash)
-            u_c[u] = c; _logic(c, u)
-            await cv.send_message("✅ LOGIN OK!")
-        except Exception as e: await cv.send_message(f"❌ {e}")
+            u_c[u] = c
+            _logic(c, u)
+            await cv.send_message("✅ **LOGIN THÀNH CÔNG!**")
+        except Exception as e: await cv.send_message(f"❌ {str(e)}")
 
 @bot.on(events.NewMessage(pattern='/start'))
 async def _st(ev):
@@ -156,11 +185,14 @@ async def _tb(e):
     with open(F1, "r") as f: ids = f.read().splitlines()
     await e.respond(f"📢 Đang gửi TB cho {len(ids)} người...")
     for uid in ids:
-        try: await bot.send_message(int(uid), f"📢 **TB:** {msg}"); await asyncio.sleep(0.3)
+        try:
+            await bot.send_message(int(uid), f"📢 **TB:** {msg}")
+            await asyncio.sleep(0.3)
         except: continue
-    await e.respond("✅ Xong!")
+    await e.respond("✅ Hoàn tất!")
 
 if __name__ == '__main__':
+    print("REX SYSTEM IS READY.")
     bot.run_until_disconnected()
 
 ```
