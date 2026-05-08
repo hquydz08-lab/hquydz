@@ -1,3 +1,4 @@
 telethon
-gtts
-flask
+requests
+edge-tts
+asyncio
