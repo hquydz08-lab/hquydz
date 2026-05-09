@@ -206,11 +206,42 @@ def setup_user_logic(client, user_id):
                     await asyncio.sleep(d)
                 except: break
 
-    @client.on(events.NewMessage(outgoing=True, pattern='/stop'))
-    async def stop(e):
+      @client.on(events.NewMessage(outgoing=True, pattern='/stop'))
+    async def stop_war(e):
         stop_tasks[user_id] = True
-        await e.edit("🛑 **ĐÃ DỪNG!**")
+        await e.edit("🛑 **𝑫𝑼‌𝑵𝑮!**")
 
+    # ================== LỆNH VOICE AI ==================
+    @client.on(events.NewMessage(outgoing=True, pattern=r'/voice (.+)'))
+    async def voice_cmd(e):
+        text = e.pattern_match.group(1).strip()
+        if not text:
+            return await e.edit("❌ Vui lòng nhập nội dung cần đọc.")
+        if len(text) > 500:
+            return await e.edit("❌ Nội dung quá dài (tối đa 500 ký tự).")
+
+        await e.edit("🔄 Đang tạo giọng nói AI...")
+
+        try:
+            from gtts import gTTS
+            import io
+
+            tts = gTTS(text=text, lang='vi', slow=False)
+            voice_bytes = io.BytesIO()
+            tts.write_to_fp(voice_bytes)
+            voice_bytes.seek(0)
+
+            await client.send_file(
+                e.chat_id,
+                voice_bytes,
+                voice_note=True,
+                caption=f"🔊 Voice AI\n\n{text[:100]}{'...' if len(text) > 100 else ''}"
+            )
+            await e.delete()
+        except Exception as err:
+            await e.edit(f"❌ Lỗi tạo voice: {err}")
+
+    print(f"✅ Userbot {user_id} loaded!")
 # ====================== KEY + LOGIN ======================
 @bot.on(events.NewMessage(pattern=r'/nhapkey (.+)'))
 async def nhap_key_logic(e):
