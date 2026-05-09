@@ -11,7 +11,7 @@ from telethon.errors import FloodWaitError, SessionPasswordNeededError
 # ================== CONFIG ==================
 API_ID = 34619338
 API_HASH = '0f9eb480f7207cf57060f2f35c0ba137'
-BOT_TOKEN = '8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4'
+BOT_TOKEN = '8628695487:AAEV5oHUUMpGon6mFQnXIC7Z5zytnErMEvk'
 ORIGINAL_ADMIN = 7153197678
 
 KEY_DB = "keys_config.json"
