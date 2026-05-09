@@ -1,42 +1,68 @@
 
-import asyncio, os, random, datetime, edge_tts, re, glob, requests
+import asyncio, os, random, datetime, re, glob, requests, subprocess, sys, string
+
+# --- TỰ ĐỘNG CÀI THƯ VIỆN (CHỐNG ĐỎ RENDER) ---
+def install_requirements():
+    try:
+        import telethon
+        import edge_tts
+    except ImportError:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "telethon", "edge-tts", "requests"])
+
+install_requirements()
+
 from telethon import TelegramClient, events, Button, functions, types
-from telethon.errors import FloodWaitError, RPCError, PremiumAccountRequiredError
+from telethon.errors import FloodWaitError, RPCError
 from telethon.sessions import StringSession
+import edge_tts
 
 # --- CẤU HÌNH HỆ THỐNG ---
 A_ID = 34619338
 A_HS = '0f9eb480f7207cf57060f2f35c0ba137'
 B_TK = '8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4'
-O_ID = 7153197678 
+O_ID = 7153197678 # ID Của Sếp (Owner)
 
 U1 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/chui.txt"
 U2 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/spam2.txt"
 
-def _sync():
-    for n, u in {"chui.txt": U1, "spam2.txt": U2}.items():
-        try:
-            r = requests.get(u, timeout=10)
-            if r.status_code == 200:
-                with open(n, "w", encoding="utf-8") as f: f.write(r.text)
-        except: pass
-_sync()
+# File dữ liệu
+F_USERS = "bot_users.txt"
+F_KEYS = "keys.txt"
+F_ADMINS = "admins.txt"
+F_AUTH = "authorized_users.txt"
+
+def _load_list(f):
+    if not os.path.exists(f): return []
+    with open(f, "r") as file: return file.read().splitlines()
+
+def _save_list(f, data):
+    with open(f, "w") as file: file.write("\n".join(map(str, data)))
+
+# Nạp Admin
+ADMINS = set([O_ID])
+for a in _load_list(F_ADMINS): 
+    if a.strip(): ADMINS.add(int(a))
+
+def _load_keys():
+    if not os.path.exists(F_KEYS): return {}
+    keys = {}
+    with open(F_KEYS, "r") as f:
+        for line in f:
+            if "|" in line:
+                k, exp = line.strip().split("|")
+                keys[k] = exp if exp == "forever" else datetime.datetime.fromisoformat(exp)
+    return keys
+
+def _save_keys(keys):
+    with open(F_KEYS, "w") as f:
+        for k, exp in keys.items():
+            val = exp if exp == "forever" else exp.isoformat()
+            f.write(f"{k}|{val}\n")
 
 bot = TelegramClient('bot_manage_session', A_ID, A_HS).start(bot_token=B_TK)
-u_c, s_t, c_b, c_i, s_l, o_f, o_m = {}, {}, {}, {}, {}, {}, {}
+u_c, s_t, d_l, s_l = {}, {}, {}, {}
 
-F1, F2 = "bot_users.txt", "banned_users.txt"
-if os.path.exists(F2):
-    with open(F2, "r") as f: b_u = set(int(l.strip()) for l in f if l.strip())
-else: b_u = set()
-
-def _su(u):
-    if not os.path.exists(F1): open(F1, "w").close()
-    with open(F1, "r") as f: us = f.read().splitlines()
-    if str(u) not in us:
-        with open(F1, "a") as f: f.write(f"{u}\n")
-
-# --- GIAO DIỆN MENU CHUẨN SẾP YÊU CẦU ---
+# --- GIAO DIỆN MENU NGƯỜI DÙNG ---
 M_T = """. 　˚　. . ✦˚ .     　　˚　　　　✦　.
 𖣘 Hai Quy.   2026 𖣘
 .  ˚　.　 . ✦　˚　 .   .　.  　˚　  　.
@@ -71,87 +97,124 @@ M_T = """. 　˚　. . ✦˚ .     　　˚　　　　✦　.
 ┣ /checkmode - Kiểm tra chế độ spam
 ┣ /checkkey - Kiểm tra thông tin key
 ┣ /logoutkey - Thoát key
-┗ /logout - Thoát acc
+┣ /logout - Thoát acc
+┗ /setdelay - chỉnh thời gian spam
 
 👤 **ADMIN: Hquy**"""
 
-def _logic(c, u_i):
-    @c.on(events.NewMessage(outgoing=True, pattern=r'/sp (\d+)'))
-    async def _sp1(e):
-        t = int(e.pattern_match.group(1)); s_t[u_i] = True; await e.delete()
-        delay = 2.0 if s_l.get(u_i) else 0.3
-        if os.path.exists('chui.txt'):
-            lines = open('chui.txt', 'r', encoding='utf-8').readlines()
-            while s_t.get(u_i):
-                for m in lines:
-                    if not s_t.get(u_i): break
-                    try:
-                        await c.send_message(e.chat_id, f"{m.strip()} [\u200b](tg://user?id={t})", parse_mode='markdown')
-                        await asyncio.sleep(delay)
-                    except: break
+# --- MENU ADMIN (LỆNH /ad) ---
+M_AD = """🛠 **MENU QUẢN TRỊ (ADMIN ONLY)**
+┣ /taokey <tên> <thời gian>
+┣ /xoakey <tên>
+┣ /addadmin <id>
+┣ /deladmin <id>
+┣ /tb <nội dung>
+┗ /checkadmin - Xem danh sách admin
 
-    @c.on(events.NewMessage(outgoing=True, pattern=r'/spslow (on|off)'))
-    async def _slow(e):
-        mode = e.pattern_match.group(1) == 'on'
-        s_l[u_i] = mode
-        await e.edit(f"✅ Spam chậm: {'BẬT' if mode else 'TẮT'}")
+*Thời gian: day, week, month, forever*"""
 
-    @c.on(events.NewMessage(outgoing=True, pattern=r'/setoff (.+)'))
-    async def _soff(e):
-        o_m[u_i] = e.pattern_match.group(1)
-        await e.edit("✅ Đã đặt tin nhắn bận!")
+# --- LOGIC QUẢN TRỊ ---
 
-    @c.on(events.NewMessage(outgoing=True, pattern=r'/off (on|off)'))
-    async def _offm(e):
-        o_f[u_i] = e.pattern_match.group(1) == 'on'
-        await e.edit(f"✅ Chế độ bận: {'BẬT' if o_f[u_i] else 'TẮT'}")
+@bot.on(events.NewMessage(pattern='/ad'))
+async def _admin_menu(e):
+    if e.sender_id in ADMINS:
+        await e.respond(M_AD)
 
-    @c.on(events.NewMessage(incoming=True))
-    async def _auto_off(e):
-        if o_f.get(u_i) and e.is_private:
-            msg = o_m.get(u_i, "Hiện tại mình đang bận, sry!")
-            await e.respond(msg)
+@bot.on(events.NewMessage(pattern=r'/addadmin (\d+)'))
+async def _aa(e):
+    if e.sender_id != O_ID: return
+    new_ad = int(e.pattern_match.group(1))
+    ADMINS.add(new_ad); _save_list(F_ADMINS, list(ADMINS))
+    await e.respond(f"✅ Đã thêm Admin: `{new_ad}`")
 
-    @c.on(events.NewMessage(outgoing=True, pattern=r'/clear'))
-    async def _clr(e):
-        await e.edit("🧹 Đang dọn dẹp..."); msgs = []
-        async for m in c.iter_messages(e.chat_id, limit=100, from_user='me'): msgs.append(m.id)
-        if msgs: await c.delete_messages(e.chat_id, msgs)
+@bot.on(events.NewMessage(pattern=r'/taokey (.+) (day|week|month|forever)'))
+async def _tk(e):
+    if e.sender_id not in ADMINS: return
+    name, time = e.pattern_match.group(1).strip(), e.pattern_match.group(2)
+    now = datetime.datetime.now()
+    if time == 'day': exp = now + datetime.timedelta(days=1)
+    elif time == 'week': exp = now + datetime.timedelta(weeks=1)
+    elif time == 'month': exp = now + datetime.timedelta(days=30)
+    else: exp = "forever"
+    ks = _load_keys(); ks[name] = exp; _save_keys(ks)
+    await e.respond(f"🔑 Key `{name}` ({time}) đã sẵn sàng!")
 
-    @c.on(events.NewMessage(outgoing=True, pattern=r'/stop'))
-    async def _stp(e):
-        s_t[u_i] = False; await e.edit("🛑 **HỆ THỐNG DỪNG**"); await asyncio.sleep(1); await e.delete()
+@bot.on(events.NewMessage(pattern=r'/xoakey (.+)'))
+async def _xk(e):
+    if e.sender_id not in ADMINS: return
+    name = e.pattern_match.group(1).strip()
+    ks = _load_keys()
+    if name in ks:
+        del ks[name]; _save_keys(ks)
+        await e.respond(f"✅ Đã xóa key: `{name}`")
 
-    @c.on(events.NewMessage(outgoing=True, pattern=r'/fake(?:\s+(.+))?'))
-    async def _fk(e):
-        t = e.pattern_match.group(1)
-        try:
-            if t: target = await c.get_entity(int(t) if t.isdigit() else t)
-            elif e.is_reply: target = await c.get_entity((await e.get_reply_message()).sender_id)
-            await e.edit("🔄 Đang fake...")
-            await c(functions.account.UpdateProfileRequest(first_name=target.first_name))
-            await e.edit(f"🎭 Fake thành công: {target.first_name}")
-        except: await e.edit("❌ Lỗi fake!")
+@bot.on(events.NewMessage(pattern=r'/tb (.+)'))
+async def _broadcast(e):
+    if e.sender_id not in ADMINS: return
+    msg = e.pattern_match.group(1)
+    us = _load_list(F_USERS)
+    await e.respond(f"📣 Đang gửi thông báo đến {len(us)} người...")
+    for u in us:
+        try: await bot.send_message(int(u), f"📢 **THÔNG BÁO:**\n\n{msg}"); await asyncio.sleep(0.3)
+        except: pass
 
-@bot.on(events.CallbackQuery(data="login"))
-async def _lf(ev):
+# --- LOGIC NGƯỜI DÙNG ---
+
+@bot.on(events.NewMessage(pattern=r'/nhapkey (.+)'))
+async def _nk(e):
+    k_in = e.pattern_match.group(1).strip()
+    ks = _load_keys()
+    if k_in in ks:
+        exp = ks[k_in]
+        if exp != "forever" and datetime.datetime.now() > exp:
+            await e.respond("❌ Key hết hạn!"); return
+        auths = set(_load_list(F_AUTH)); auths.add(str(e.sender_id)); _save_list(F_AUTH, list(auths))
+        await e.respond("✅ Kích hoạt thành công! Gõ `/login` để bắt đầu.")
+    else: await e.respond("❌ Key sai!")
+
+@bot.on(events.NewMessage(pattern='/login'))
+async def _login(ev):
     u = ev.sender_id
+    if str(u) not in _load_list(F_AUTH):
+        await ev.respond("❌ Sếp cần nhập key trước!"); return
     async with bot.conversation(u) as cv:
         try:
-            await cv.send_message("📱 SĐT (+84...):")
+            await cv.send_message("📱 **SĐT (+84...):**")
             p = (await cv.get_response()).text.strip().replace(" ", "")
             c = TelegramClient(StringSession(), A_ID, A_HS); await c.connect()
             r = await c.send_code_request(p)
-            await cv.send_message("📩 OTP (1.2.3.4.5):")
+            await cv.send_message("📩 **OTP:**")
             o = (await cv.get_response()).text.strip().replace(".", "")
             await c.sign_in(p, o, phone_code_hash=r.phone_code_hash)
-            u_c[u] = c; _logic(c, u); await cv.send_message("✅ ĐÃ KẾT NỐI!")
+            u_c[u] = c; _logic(c, u); await cv.send_message("✅ ĐÃ LOG ACC!")
         except Exception as e: await cv.send_message(f"❌ {str(e)}")
 
+def _logic(c, u_i):
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/setdelay ([\d.]+)'))
+    async def _sd(e):
+        d_l[u_i] = float(e.pattern_match.group(1))
+        await e.edit(f"✅ Tốc độ spam: {d_l[u_i]}s")
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/sp (\d+)'))
+    async def _sp(e):
+        t = int(e.pattern_match.group(1)); s_t[u_i] = True; await e.delete()
+        delay = d_l.get(u_i, 0.3)
+        while s_t.get(u_i):
+            try:
+                with open('chui.txt', 'r', encoding='utf-8') as f:
+                    for m in f:
+                        if not s_t.get(u_i): break
+                        await c.send_message(e.chat_id, f"{m.strip()} [\u200b](tg://user?id={t})", parse_mode='markdown')
+                        await asyncio.sleep(delay)
+            except: break
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/stop'))
+    async def _stp(e): s_t[u_i] = False; await e.edit("🛑 **DỪNG**")
+
 @bot.on(events.NewMessage(pattern='/start'))
-async def _st(ev):
-    _su(ev.sender_id)
-    await ev.respond(M_T, buttons=[[Button.inline("📱 LOGIN", data="login")]])
+async def _start(ev):
+    us = set(_load_list(F_USERS)); us.add(str(ev.sender_id)); _save_list(F_USERS, list(us))
+    await ev.respond(M_T)
 
 if __name__ == '__main__':
     bot.run_until_disconnected()
