@@ -277,4 +277,6 @@ async def main():
     await bot.run_until_disconnected()
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(main())
