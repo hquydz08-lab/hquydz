@@ -1,4 +1,3 @@
-telethon==1.35.0
+telethon
 requests
-edge-tts
-cryptg
+gTTS
