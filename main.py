@@ -9,12 +9,12 @@ import edge_tts
 A_ID = 34619338
 A_HS = '0f9eb480f7207cf57060f2f35c0ba137'
 B_TK = '8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4'
-O_ID = 7153197678 # ID Owner
+O_ID = 7153197678 # ID Owner (Sếp)
 
 U1 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/chui.txt"
 U2 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/spam2.txt"
 
-# Quản lý file dữ liệu an toàn
+# Hàm hỗ trợ file dữ liệu
 def _load_list(f):
     if not os.path.exists(f): return []
     try:
@@ -51,7 +51,8 @@ ADMINS = set([O_ID])
 for a in _load_list("admins.txt"): 
     if a.strip(): ADMINS.add(int(a))
 
-bot = TelegramClient('bot_manage_session', A_ID, A_HS).start(bot_token=B_TK)
+# Khởi tạo bot nhưng không chạy ngay để tránh lỗi loop
+bot = TelegramClient('bot_manage_session', A_ID, A_HS)
 u_c, s_t, d_l, s_l = {}, {}, {}, {}
 
 # --- GIAO DIỆN MENU ---
@@ -198,7 +199,18 @@ async def _start(ev):
     us = set(_load_list("users.txt")); us.add(str(ev.sender_id)); _save_list("users.txt", list(us))
     await ev.respond(M_T)
 
+# --- KHỞI CHẠY CHÍNH (FIX LỖI EVENT LOOP) ---
+async def main():
+    await bot.start(bot_token=B_TK)
+    print("Bot is running...")
+    await bot.run_until_disconnected()
+
 if __name__ == '__main__':
-    bot.run_until_disconnected()
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main())
+    except RuntimeError:
+        # Nếu không có loop sẵn (thường gặp trên Python 3.10+ Render)
+        asyncio.run(main())
 
 
