@@ -1,20 +1,31 @@
 
-import asyncio, os, random, datetime, re, glob, requests, string
+import asyncio, os, random, datetime, re, requests, string, threading
 from telethon import TelegramClient, events, Button, functions, types
-from telethon.errors import FloodWaitError, RPCError
 from telethon.sessions import StringSession
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import edge_tts
 
 # --- CẤU HÌNH HỆ THỐNG ---
 A_ID = 34619338
 A_HS = '0f9eb480f7207cf57060f2f35c0ba137'
 B_TK = '8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4'
-O_ID = 7153197678 # ID Owner (Sếp)
+O_ID = 7153197678 
 
 U1 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/chui.txt"
 U2 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/spam2.txt"
 
-# Hàm hỗ trợ file dữ liệu
+# --- SERVER ĐỂ RENDER KHÔNG BÁO LỖI PORT ---
+class HealthCheck(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
+
+def run_port_server():
+    port = int(os.environ.get("PORT", 10000))
+    HTTPServer(('0.0.0.0', port), HealthCheck).serve_forever()
+
+# --- QUẢN LÝ DỮ LIỆU ---
 def _load_list(f):
     if not os.path.exists(f): return []
     try:
@@ -46,12 +57,10 @@ def _save_keys(keys):
                 f.write(f"{k}|{val}\n")
     except: pass
 
-# Khởi tạo Admin
 ADMINS = set([O_ID])
 for a in _load_list("admins.txt"): 
     if a.strip(): ADMINS.add(int(a))
 
-# Khởi tạo bot nhưng không chạy ngay để tránh lỗi loop
 bot = TelegramClient('bot_manage_session', A_ID, A_HS)
 u_c, s_t, d_l, s_l = {}, {}, {}, {}
 
@@ -95,25 +104,18 @@ M_T = """. 　˚　. . ✦˚ .     　　˚　　　　✦　.
 
 👤 **ADMIN: Hquy**"""
 
-M_AD = """🛠 **ADMIN MENU**
-┣ /taokey <tên> <day/week/month/forever>
-┣ /xoakey <tên>
-┣ /addadmin <id>
-┣ /deladmin <id>
-┣ /tb <nội dung>
-┗ /checkadmin"""
-
-# --- LOGIC QUẢN TRỊ ---
+# --- LOGIC ADMIN ---
 @bot.on(events.NewMessage(pattern='/ad'))
 async def _ad(e):
-    if e.sender_id in ADMINS: await e.respond(M_AD)
+    if e.sender_id in ADMINS:
+        await e.respond("🛠 **ADMIN MENU**\n/taokey <tên> <day/week/month/forever>\n/xoakey <tên>\n/addadmin <id>\n/deladmin <id>\n/tb <nội dung>")
 
 @bot.on(events.NewMessage(pattern=r'/addadmin (\d+)'))
 async def _aa(e):
     if e.sender_id != O_ID: return
     nid = int(e.pattern_match.group(1))
     ADMINS.add(nid); _save_list("admins.txt", list(ADMINS))
-    await e.respond(f"✅ Admin `{nid}` đã được thêm!")
+    await e.respond(f"✅ Đã thêm Admin: `{nid}`")
 
 @bot.on(events.NewMessage(pattern=r'/taokey (.+) (day|week|month|forever)'))
 async def _tk(e):
@@ -124,15 +126,16 @@ async def _tk(e):
            now + datetime.timedelta(weeks=1) if t=='week' else 
            now + datetime.timedelta(days=30) if t=='month' else "forever")
     ks = _load_keys(); ks[k] = exp; _save_keys(ks)
-    await e.respond(f"🔑 Key `{k}` ({t}) đã tạo!")
+    await e.respond(f"🔑 Key `{k}` ({t}) đã sẵn sàng!")
 
-@bot.on(events.NewMessage(pattern=r'/xoakey (.+)'))
-async def _xk(e):
+@bot.on(events.NewMessage(pattern=r'/tb (.+)'))
+async def _tb(e):
     if e.sender_id not in ADMINS: return
-    k = e.pattern_match.group(1).strip()
-    ks = _load_keys()
-    if k in ks:
-        del ks[k]; _save_keys(ks); await e.respond(f"✅ Xóa key `{k}`")
+    msg = e.pattern_match.group(1)
+    for u in _load_list("users.txt"):
+        try: await bot.send_message(int(u), f"📢 **TB:** {msg}"); await asyncio.sleep(0.3)
+        except: pass
+    await e.respond("✅ Đã phát thông báo!")
 
 # --- LOGIC NGƯỜI DÙNG ---
 @bot.on(events.NewMessage(pattern=r'/nhapkey (.+)'))
@@ -144,13 +147,13 @@ async def _nk(e):
         if exp != "forever" and datetime.datetime.now() > exp:
             await e.respond("❌ Key hết hạn!"); return
         auths = set(_load_list("auth.txt")); auths.add(str(e.sender_id)); _save_list("auth.txt", list(auths))
-        await e.respond("✅ Kích hoạt thành công! Gõ `/login` để log acc.")
-    else: await e.respond("❌ Key sai!")
+        await e.respond("✅ Kích hoạt thành công! Dùng `/login` để log acc.")
+    else: await e.respond("❌ Key không tồn tại!")
 
 @bot.on(events.NewMessage(pattern='/login'))
 async def _lg(ev):
     if str(ev.sender_id) not in _load_list("auth.txt"):
-        await ev.respond("❌ Chưa nhập key!"); return
+        await ev.respond("❌ Sếp cần nhập key trước!"); return
     async with bot.conversation(ev.sender_id) as cv:
         try:
             await cv.send_message("📱 **SĐT (+84...):**")
@@ -160,14 +163,14 @@ async def _lg(ev):
             await cv.send_message("📩 **OTP:**")
             o = (await cv.get_response()).text.strip().replace(".", "")
             await c.sign_in(p, o, phone_code_hash=r.phone_code_hash)
-            u_c[ev.sender_id] = c; _logic(c, ev.sender_id); await cv.send_message("✅ LOG ACC THÀNH CÔNG!")
+            u_c[ev.sender_id] = c; _logic(c, ev.sender_id); await cv.send_message("✅ ĐĂNG NHẬP THÀNH CÔNG!")
         except Exception as e: await cv.send_message(f"❌ Lỗi: {str(e)}")
 
 def _logic(c, ui):
     @c.on(events.NewMessage(outgoing=True, pattern=r'/setdelay ([\d.]+)'))
     async def _sd(e):
         d_l[ui] = float(e.pattern_match.group(1))
-        await e.edit(f"✅ Delay: {d_l[ui]}s")
+        await e.edit(f"✅ Tốc độ: {d_l[ui]}s")
 
     @c.on(events.NewMessage(outgoing=True, pattern=r'/sp (\d+)'))
     async def _sp(e):
@@ -182,8 +185,8 @@ def _logic(c, ui):
                     await asyncio.sleep(delay)
             except: break
 
-    @c.on(events.NewMessage(outgoing=True, pattern=r'/stop'))
-    async def _stp(e): s_t[ui] = False; await e.edit("🛑 **DỪNG**")
+    @c.on(events.NewMessage(outgoing=True, pattern='/stop'))
+    async def _stp(e): s_t[ui] = False; await e.edit("🛑 DỪNG")
 
     @c.on(events.NewMessage(outgoing=True, pattern=r'/voice (.+)'))
     async def _v(e):
@@ -199,18 +202,19 @@ async def _start(ev):
     us = set(_load_list("users.txt")); us.add(str(ev.sender_id)); _save_list("users.txt", list(us))
     await ev.respond(M_T)
 
-# --- KHỞI CHẠY CHÍNH (FIX LỖI EVENT LOOP) ---
-async def main():
+# --- CHẠY ---
+async def start_all():
     await bot.start(bot_token=B_TK)
-    print("Bot is running...")
+    print("Bot is alive on Render!")
     await bot.run_until_disconnected()
 
 if __name__ == '__main__':
+    threading.Thread(target=run_port_server, daemon=True).start()
     try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
-    except RuntimeError:
-        # Nếu không có loop sẵn (thường gặp trên Python 3.10+ Render)
-        asyncio.run(main())
+        asyncio.run(start_all())
+    except:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(start_all())
 
 
