@@ -168,24 +168,19 @@ def setup_user_logic(client, user_id):
     @client.on(events.NewMessage(outgoing=True))
     async def global_check(e):
         if not is_active(user_id):
-            try:
-                await e.edit("⚠️ **HẾT HẠN!** Liên hệ @hquycute")
-                await client.log_out()
-            except: pass
+            await e.edit("⚠️ **𝑯𝑬‌𝑻 𝑯𝑨‌𝑵!** Liên hệ Admin để gia hạn.")
+            await client.log_out()
 
     @client.on(events.NewMessage(outgoing=True, pattern='/checkkey'))
-    async def check_key(e):
-        try:
-            exp = datetime.datetime.fromisoformat(user_expiry[str(user_id)])
-            t = "VĨNH VIỄN" if exp.year > 9000 else exp.strftime('%d/%m/%Y %H:%M')
-            await e.edit(f"🔑 **Thời hạn:** `{t}`")
-        except:
-            await e.edit("❌ Chưa có key.")
+    async def check_key_user(e):
+        exp = datetime.datetime.fromisoformat(user_expiry[str(user_id)])
+        t = "𝑽𝑰𝑵𝑯 𝑽𝑰𝑬‌𝑵" if exp.year > 9000 else exp.strftime('%d/%m/%Y %H:%M')
+        await e.edit(f"🔑 **𝑻𝒉𝒐‌𝒊 𝒉𝒂‌𝒏:** `{t}`")
 
     @client.on(events.NewMessage(outgoing=True, pattern=r'/setdelay ([\d.]+)'))
-    async def set_delay(e):
+    async def set_delay_user(e):
         user_delays[user_id] = float(e.pattern_match.group(1))
-        await e.edit(f"⏳ **Delay:** `{user_delays[user_id]}s`")
+        await e.edit(f"⏳ **𝑻𝒐‌𝒄 đ𝒐‌:** `{user_delays[user_id]}s`")
 
     @client.on(events.NewMessage(outgoing=True, pattern=r'/sp (\d+)'))
     async def sp_war(e):
@@ -193,20 +188,21 @@ def setup_user_logic(client, user_id):
         await e.delete()
         stop_tasks[user_id] = False
         try:
-            r = requests.get("https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/chui.txt", timeout=10)
-            lines = r.text.splitlines() if r.status_code == 200 else ["War..."]
+            lines = requests.get("https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/chui.txt").text.splitlines()
         except:
-            lines = ["War..."]
+            lines = ["War mạnh lên sếp!"]
         while not stop_tasks.get(user_id):
             d = user_delays.get(user_id, 0.05)
             for m in lines:
-                if stop_tasks.get(user_id): break
+                if stop_tasks.get(user_id):
+                    break
                 try:
                     await client.send_message(e.chat_id, f"{m.strip()} [\u200b](tg://user?id={target})")
                     await asyncio.sleep(d)
-                except: break
+                except:
+                    break
 
-      @client.on(events.NewMessage(outgoing=True, pattern='/stop'))
+    @client.on(events.NewMessage(outgoing=True, pattern='/stop'))
     async def stop_war(e):
         stop_tasks[user_id] = True
         await e.edit("🛑 **𝑫𝑼‌𝑵𝑮!**")
