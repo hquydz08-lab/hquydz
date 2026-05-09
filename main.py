@@ -19,20 +19,17 @@ O_ID = 7153197678
 U1 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/chui.txt"
 U2 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/spam2.txt"
 
-# --- SERVER ĐỂ RENDER KHÔNG BÁO LỖI PORT (HEALTH CHECK) ---
+# --- SERVER ĐỂ RENDER KHÔNG BÁO LỖI PORT ---
 class HealthCheck(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot is alive and kicking!")
-
-    def log_message(self, format, *args):
-        return # Tắt log rác của server
+        self.wfile.write(b"Bot is alive!")
+    def log_message(self, format, *args): return
 
 def run_port_server():
     port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(('0.0.0.0', port), HealthCheck)
-    server.serve_forever()
+    HTTPServer(('0.0.0.0', port), HealthCheck).serve_forever()
 
 # --- QUẢN LÝ DỮ LIỆU ---
 def _load_list(f):
@@ -66,15 +63,14 @@ def _save_keys(keys):
                 f.write(f"{k}|{val}\n")
     except: pass
 
-# --- KHỞI TẠO ---
 ADMINS = set([O_ID])
 for a in _load_list("admins.txt"): 
     if a.strip(): ADMINS.add(int(a))
 
 bot = TelegramClient('bot_manage_session', A_ID, A_HS)
-u_c, s_t, d_l = {}, {}, {}
+u_c, s_t, d_l, s_l, autore_on = {}, {}, {}, {}, {}
 
-# --- GIAO DIỆN MENU ---
+# --- GIAO DIỆN MENU (GIỮ NGUYÊN BẢN GỐC) ---
 M_T = """. 　˚　. . ✦˚ .     　　˚　　　　✦　.
 𖣘 Hai Quy.   2026 𖣘
 .  ˚　.　 . ✦　˚　 .   .　.  　˚　  　.
@@ -118,15 +114,7 @@ M_T = """. 　˚　. . ✦˚ .     　　˚　　　　✦　.
 @bot.on(events.NewMessage(pattern='/ad'))
 async def _ad(e):
     if e.sender_id in ADMINS:
-        m = "🛠 **ADMIN MENU**\n/taokey <tên> <day/week/month/forever>\n/xoakey <tên>\n/addadmin <id>\n/deladmin <id>\n/tb <nội dung>"
-        await e.respond(m)
-
-@bot.on(events.NewMessage(pattern=r'/addadmin (\d+)'))
-async def _aa(e):
-    if e.sender_id != O_ID: return
-    nid = int(e.pattern_match.group(1))
-    ADMINS.add(nid); _save_list("admins.txt", list(ADMINS))
-    await e.respond(f"✅ Đã thêm Admin: `{nid}`")
+        await e.respond("🛠 **ADMIN MENU**\n/taokey <tên> <day/week/month/forever>\n/xoakey <tên>\n/addadmin <id>\n/deladmin <id>\n/tb <nội dung>")
 
 @bot.on(events.NewMessage(pattern=r'/taokey (.+) (day|week|month|forever)'))
 async def _tk(e):
@@ -137,38 +125,41 @@ async def _tk(e):
            now + datetime.timedelta(weeks=1) if t=='week' else 
            now + datetime.timedelta(days=30) if t=='month' else "forever")
     ks = _load_keys(); ks[k] = exp; _save_keys(ks)
-    await e.respond(f"🔑 Key `{k}` ({t}) OK!")
+    await e.respond(f"🔑 Đã tạo Key: `{k}`")
 
 # --- LOGIC NGƯỜI DÙNG ---
+@bot.on(events.NewMessage(pattern='/start'))
+async def _start(ev):
+    us = set(_load_list("users.txt")); us.add(str(ev.sender_id)); _save_list("users.txt", list(us))
+    await ev.respond(M_T)
+
 @bot.on(events.NewMessage(pattern=r'/nhapkey (.+)'))
 async def _nk(e):
     kin = e.pattern_match.group(1).strip()
     ks = _load_keys()
     if kin in ks:
-        exp = ks[kin]
-        if exp != "forever" and datetime.datetime.now() > exp:
-            await e.respond("❌ Key hết hạn!"); return
         auths = set(_load_list("auth.txt")); auths.add(str(e.sender_id)); _save_list("auth.txt", list(auths))
-        await e.respond("✅ Kích hoạt OK! Dùng `/login`.")
-    else: await e.respond("❌ Key sai!")
+        await e.respond("✅ Kích hoạt thành công! Gõ `/login`.")
+    else: await e.respond("❌ Sai Key!")
 
 @bot.on(events.NewMessage(pattern='/login'))
 async def _lg(ev):
     if str(ev.sender_id) not in _load_list("auth.txt"):
-        await ev.respond("❌ Cần nhập key!"); return
+        await ev.respond("❌ Phải nhập key trước!"); return
     async with bot.conversation(ev.sender_id) as cv:
         try:
             await cv.send_message("📱 **SĐT (+84...):**")
-            p = (await cv.get_response()).text.strip().replace(" ", "")
+            p = (await cv.get_response()).text.strip()
             c = TelegramClient(StringSession(), A_ID, A_HS); await c.connect()
             r = await c.send_code_request(p)
             await cv.send_message("📩 **OTP:**")
             o = (await cv.get_response()).text.strip().replace(".", "")
             await c.sign_in(p, o, phone_code_hash=r.phone_code_hash)
-            u_c[ev.sender_id] = c; _logic(c, ev.sender_id); await cv.send_message("✅ LOG ACC OK!")
-        except Exception as e: await cv.send_message(f"❌ {str(e)}")
+            u_c[ev.sender_id] = c; _logic(c, ev.sender_id); await cv.send_message("✅ ĐÃ ĐĂNG NHẬP!")
+        except Exception as e: await cv.send_message(f"❌ Lỗi: {str(e)}")
 
 def _logic(c, ui):
+    # Spam Chửi
     @c.on(events.NewMessage(outgoing=True, pattern=r'/sp (\d+)'))
     async def _sp(e):
         t = int(e.pattern_match.group(1)); s_t[ui] = True; await e.delete()
@@ -178,36 +169,53 @@ def _logic(c, ui):
                 r = requests.get(U1, timeout=5)
                 for m in r.text.splitlines():
                     if not s_t.get(ui): break
-                    await c.send_message(e.chat_id, f"{m.strip()} [\u200b](tg://user?id={t})", parse_mode='markdown')
+                    await c.send_message(e.chat_id, f"{m.strip()} [\u200b](tg://user?id={t})")
                     await asyncio.sleep(delay)
             except: break
 
+    # Stop All
     @c.on(events.NewMessage(outgoing=True, pattern='/stop'))
-    async def _stp(e): s_t[ui] = False; await e.edit("🛑 DỪNG")
+    async def _stp(e): s_t[ui] = False; await e.edit("🛑 ĐÃ DỪNG TẤT CẢ")
 
-@bot.on(events.NewMessage(pattern='/start'))
-async def _start(ev):
-    us = set(_load_list("users.txt")); us.add(str(ev.sender_id)); _save_list("users.txt", list(us))
-    await ev.respond(M_T)
+    # Set Delay
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/setdelay ([\d.]+)'))
+    async def _sd(e):
+        d_l[ui] = float(e.pattern_match.group(1))
+        await e.edit(f"✅ Đã chỉnh Delay: {d_l[ui]}s")
 
-# --- KHỞI CHẠY CHỐNG LỖI EVENT LOOP ---
-async def start_bot():
+    # Voice
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/voice (.+)'))
+    async def _v(e):
+        txt = e.pattern_match.group(1); await e.delete(); p = f"v_{ui}.mp3"
+        try:
+            comm = edge_tts.Communicate(txt, "vi-VN-NamMinhNeural")
+            await comm.save(p); await c.send_file(e.chat_id, p, voice_note=True)
+        except: pass
+        if os.path.exists(p): os.remove(p)
+
+    # Info
+    @c.on(events.NewMessage(outgoing=True, pattern='/info'))
+    async def _info(e):
+        rep = await e.get_reply_message()
+        target = rep.sender_id if rep else e.chat_id
+        u = await c.get_entity(target)
+        txt = f"👤 Name: {u.first_name}\n🆔 ID: `{u.id}`\n📱 User: @{u.username}"
+        await e.edit(txt)
+
+# --- KHỞI CHẠY ---
+async def main():
     await bot.start(bot_token=B_TK)
-    print("--- BOT WAR HỮU TIẾN ĐANG CHẠY ---")
+    print("Bot is ready!")
     await bot.run_until_disconnected()
 
 if __name__ == '__main__':
-    # Chạy server Port ở luồng riêng (daemon)
     threading.Thread(target=run_port_server, daemon=True).start()
     
-    # Fix triệt để lỗi "There is no current event loop"
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
-        asyncio.run(start_bot())
-    except Exception as e:
-        print(f"Error: {e}")
-        # Phương án dự phòng nếu asyncio.run thất bại
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(start_bot())
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        pass
 
 
