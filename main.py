@@ -1,153 +1,387 @@
-import asyncio
-import os
-import datetime
-import requests
-import threading
-import sys
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from telethon import TelegramClient, events, functions, types
-from telethon.sessions import StringSession
+import asyncio, os, random, datetime, edge_tts, re, glob, requests
+from telethon import TelegramClient, events, Button, functions, types
+from telethon.errors import FloodWaitError, RPCError, PremiumAccountRequiredError
 
-# --- CẤU HÌNH HỆ THỐNG ---
-API_ID = 34619338
-API_HASH = '0f9eb480f7207cf57060f2f35c0ba137'
-BOT_TOKEN = '8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4'
-OWNER_ID = 7153197678 
+# --- CẤU HÌNH ---
+A_ID = 34619338
+A_HS = '0f9eb480f7207cf57060f2f35c0ba137'
+B_TK = '8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4'
+O_ID = 7153197678 
 
-URL_CHUI = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/chui.txt"
-URL_SPAM2 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/spam2.txt"
+U1 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/chui.txt"
+U2 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/spam2.txt"
 
-# --- RENDER PORT FIX ---
-class HealthCheck(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"ALIVE")
-    def log_message(self, format, *args): return
+def _sync():
+    for n, u in {"chui.txt": U1, "spam2.txt": U2}.items():
+        try:
+            r = requests.get(u, timeout=10)
+            if r.status_code == 200:
+                with open(n, "w", encoding="utf-8") as f: f.write(r.text)
+        except: pass
+_sync()
 
-def run_server():
-    try:
-        port = int(os.environ.get("PORT", 10000))
-        server = HTTPServer(('0.0.0.0', port), HealthCheck)
-        server.serve_forever()
-    except: pass
+bot = TelegramClient('bot_manage', A_ID, A_HS).start(bot_token=B_TK)
+o_p, u_c, c_b, c_i, s_t, cl_t, a_r, o_f, w_m = {}, {}, {}, {}, {}, {}, {}, {}, {}
 
-# --- DATABASE ---
-def _load(f):
-    if not os.path.exists(f): return []
-    try:
-        with open(f, "r", encoding="utf-8") as file: return file.read().splitlines()
-    except: return []
+F1, F2 = "bot_users.txt", "banned_users.txt"
+if os.path.exists(F2):
+    with open(F2, "r") as f: b_u = set(int(l.strip()) for l in f if l.strip())
+else: b_u = set()
 
-def _save(f, d):
-    try:
-        with open(f, "w", encoding="utf-8") as file: file.write("\n".join(map(str, d)))
-    except: pass
+def _sb():
+    with open(F2, "w") as f:
+        for u in b_u: f.write(f"{u}\n")
 
-# --- KHỞI TẠO BIẾN ---
-ADMINS = set([OWNER_ID])
-for a in _load("admins.txt"): 
-    if a.strip(): ADMINS.add(int(a))
+def _su(u):
+    if not os.path.exists(F1): open(F1, "w").close()
+    with open(F1, "r") as f: us = f.read().splitlines()
+    if str(u) not in us:
+        with open(F1, "a") as f: f.write(f"{u}\n")
 
-user_clients = {}
-spam_tasks = {}
-user_delays = {}
+M_T = """
+. 　˚　. . ✦˚ .     　　˚　　　　✦　.
+𖣘Hai Quy x Bot War .   2026 𖣘
+.  ˚　.　 . ✦　˚　 .   .　.  　˚　  　.
 
-MENU = """𖣘 Hai Quy.   2026 𖣘
-🔥 **𝑺𝒑𝒂𝒎 & 𝑻𝒂𝒈**
+🔥 𝑺𝒑𝒂𝒎 & 𝑻𝒂𝒈
 ┣ /sp <id> - Spam chửi
 ┣ /sp2 <id> - Spam nội dung
 ┣ /spicon <số> - Spam icon
 ┣ /spnd <nd> - Spam treo
 ┣ /spstick <số> - Spam sticker
-┣ /spcall <id> - Spam call
-┗ /spslow <on/off> - Chế độ spam chậm
+┗ /spcall <id> - Spam call
 
-☠ **𝑯𝒆‌‌ 𝑻𝒉𝒐‌‌𝒏𝒈 Đ𝒆𝒐 𝑹𝒐‌**
+☠ 𝑯𝒆‌‌ 𝑻𝒉𝒐‌‌𝒏𝒈 Đ𝒆𝒐 𝑹𝒐‌
 ┣ /cam <id> <box> - Câm box
 ┣ /sua <id> <box> - Gỡ câm
 ┣ /camib <id> - Câm ib
 ┗ /suaib <id> - Gỡ câm ib
 
-📦 **𝑳𝒂‌𝒕 𝑽𝒂‌𝒕**
+📦 𝑳𝒂‌𝒕 𝑽𝒂‌𝒕
 ┣ /info <@/id/rep> - Soi trang
 ┣ /fake <@/id/rep> - Fake người khác
-┣ /diefake - Về lại acc gốc
-┣ /voice <text> - Voice
-┣ /autore <on/off> - Tự thả tim
+┣ /diefake - về lại acc gốc
+┣ /voice <text> - Voice 
+┣ /autore <on/off> - Tự động thả tim
 ┣ /off <on/off> - Chế độ bận
 ┣ /stop - Dừng tất cả
-┣ /clear - Xóa 100 tin
-┣ /checkkey - Kiểm tra key
-┣ /logout - Thoát acc
-┗ /setdelay - Chỉnh tốc độ
+┣ /clear - Xóa 100 tin nhắn
+┣ /clear2 - Xoá tin nhắn bot
+┗ /logout - Thoát acc
 
-👤 **ADMIN: Hquy** (Gõ /ad để quản lý)"""
+👤 **Tài khoản:** [𝙃QUY CUTI](tg://user?id= 7153197678)
+"""
 
-# --- LOGIC BOT ---
-async def start_everything():
-    # Khởi tạo client bot chính
-    bot = TelegramClient('bot_manage_session', API_ID, API_HASH)
+def _logic(c, u_i):
+    def _mk(cid): w_m[f"{u_i}_{cid}"] = datetime.datetime.now(datetime.timezone.utc)
 
-    @bot.on(events.NewMessage(pattern='/start'))
-    async def _st(e):
-        u = set(_load("users.txt")); u.add(str(e.sender_id)); _save("users.txt", list(u))
-        await e.respond(MENU)
-
-    @bot.on(events.NewMessage(pattern='/ad'))
-    async def _ad(e):
-        if e.sender_id in ADMINS:
-            await e.respond("🛠 **ADMIN PANEL**\n/addadmin <id>\n/tb <nội dung>")
-
-    @bot.on(events.NewMessage(pattern='/login'))
-    async def _lg(e):
-        async with bot.conversation(e.sender_id) as cv:
-            try:
-                await cv.send_message("📱 **SĐT (+84...):**")
-                p = (await cv.get_response()).text.strip()
-                c = TelegramClient(StringSession(), API_ID, API_HASH); await c.connect()
-                r = await c.send_code_request(p)
-                await cv.send_message("📩 **OTP:**")
-                o = (await cv.get_response()).text.strip().replace(".", "")
-                await c.sign_in(p, o, phone_code_hash=r.phone_code_hash)
-                user_clients[e.sender_id] = c
-                _handle_logic(c, e.sender_id)
-                await cv.send_message("✅ LOGIN THÀNH CÔNG!")
-            except Exception as ex: await cv.send_message(f"❌ Lỗi: {str(ex)}")
-
-    def _handle_logic(c, ui):
-        @c.on(events.NewMessage(outgoing=True, pattern=r'/sp (\d+)'))
-        async def _sp(e):
-            t = int(e.pattern_match.group(1)); spam_tasks[ui] = True; await e.delete()
-            d = user_delays.get(ui, 0.3)
-            while spam_tasks.get(ui):
+    async def _sd(cid, ct, tid=None):
+        s_t[u_i] = True
+        inf = isinstance(ct, str)
+        ls = ct if not inf else [ct]
+        n = 0
+        while s_t.get(u_i):
+            for m in ls:
+                if not s_t.get(u_i): break
                 try:
-                    res = requests.get(URL_CHUI, timeout=5)
-                    for line in res.text.splitlines():
-                        if not spam_tasks.get(ui): break
-                        await c.send_message(e.chat_id, f"{line.strip()} [\u200b](tg://user?id={t})")
-                        await asyncio.sleep(d)
+                    fm = f"{m.strip()} [\u200b](tg://user?id={tid})" if tid else m.strip()
+                    await c.send_message(cid, fm, parse_mode='markdown')
+                    await asyncio.sleep(random.uniform(0.8, 1.2))
+                    n += 1
+                    if n % 10 == 0: await asyncio.sleep(3)
+                except FloodWaitError as e: await asyncio.sleep(e.seconds + 2)
                 except: break
+            if not inf: break
 
-        @c.on(events.NewMessage(outgoing=True, pattern='/stop'))
-        async def _st(e): 
-            spam_tasks[ui] = False; await e.edit("🛑 ĐÃ DỪNG.")
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/info(?:\s+(.+))?'))
+    async def _inf(e):
+        target = e.pattern_match.group(1)
+        try:
+            if target:
+                if target.isdigit(): user = await c.get_entity(int(target))
+                else: user = await c.get_entity(target)
+            elif e.is_reply:
+                rep = await e.get_reply_message()
+                user = await c.get_entity(rep.sender_id)
+            else:
+                user = await c.get_me()
+            
+            await e.edit(f"👤 **Name:** {user.first_name}\n🆔 **ID:** `{user.id}`\n🏷 **User:** @{user.username if user.username else 'N/A'}")
+        except: await e.edit("❌ **Không tìm thấy người này!**")
 
-    # Khởi động Web Server (giữ port Render)
-    threading.Thread(target=run_server, daemon=True).start()
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/fake(?:\s+(.+))?'))
+    async def _fk(e):
+        t = e.pattern_match.group(1)
+        try:
+            if t: target = await c.get_entity(int(t) if t.isdigit() else t)
+            elif e.is_reply: target = await c.get_entity((await e.get_reply_message()).sender_id)
+            else: return await e.edit("⚠️ Tag @, ID hoặc Reply!")
+        except: return await e.edit("❌ Không thấy!")
 
-    # Chạy bot
-    await bot.start(bot_token=BOT_TOKEN)
-    print("Bot is Online and Ready!")
+        await e.edit(f"🔄 Đang lột xác...")
+        try:
+            me = await c.get_me()
+            me_f = await c(functions.users.GetFullUserRequest(id=me.id))
+            my_p = await c.download_profile_photo('me')
+            o_p[u_i] = {'f': me.first_name, 'l': me.last_name, 'a': me_f.full_user.about or "", 'p': my_p}
+
+            tf = await c(functions.users.GetFullUserRequest(id=target.id))
+            tu = tf.users[0]
+            await c(functions.account.UpdateProfileRequest(
+                first_name=tu.first_name or "", 
+                last_name=tu.last_name or "", 
+                about=tf.full_user.about or ""
+            ))
+
+            p = await c.get_profile_photos(target.id, limit=1)
+            if p:
+                path = await c.download_media(p[0])
+                await c(functions.photos.UploadProfilePhotoRequest(file=await c.upload_file(path)))
+                if os.path.exists(path): os.remove(path)
+            else:
+                curr_p = await c.get_profile_photos('me')
+                if curr_p: await c(functions.photos.DeletePhotosRequest(id=[types.InputPhoto(id=ph.id, access_hash=ph.access_hash, file_reference=ph.file_reference) for ph in curr_p]))
+            await e.edit("✅ Xong"); await asyncio.sleep(1); await e.delete()
+        except: await e.edit("❌ Lỗi Fake")
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/diefake'))
+    async def _dfk(e):
+        if u_i not in o_p: return await e.edit("⚠️ Chưa lưu gốc!")
+        await e.edit("🔙 Đang hoàn hồn...")
+        o = o_p[u_i]
+        try:
+            await c(functions.account.UpdateProfileRequest(
+                first_name=o['f'] or "", 
+                last_name=o['l'] or "", 
+                about=o['a'] or ""
+            ))
+            curr_p = await c.get_profile_photos('me')
+            if curr_p: await c(functions.photos.DeletePhotosRequest(id=[types.InputPhoto(id=ph.id, access_hash=ph.access_hash, file_reference=ph.file_reference) for ph in curr_p]))
+            if o['p'] and os.path.exists(o['p']):
+                await c(functions.photos.UploadProfilePhotoRequest(file=await c.upload_file(o['p'])))
+                os.remove(o['p'])
+            o_p.pop(u_i)
+            await e.edit("✅ Đã về gốc"); await asyncio.sleep(1); await e.delete()
+        except: await e.edit("❌ Lỗi diefake")
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/sp (\d+)'))
+    async def _sp1(e):
+        t = int(e.pattern_match.group(1)); _mk(e.chat_id); await e.delete()
+        if os.path.exists('chui.txt'): await _sd(e.chat_id, open('chui.txt', 'r', encoding='utf-8').readlines(), t)
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/sp2 (\d+)'))
+    async def _sp2(e):
+        t = int(e.pattern_match.group(1)); _mk(e.chat_id); await e.delete()
+        if os.path.exists('spam2.txt'): await _sd(e.chat_id, open('spam2.txt', 'r', encoding='utf-8').read().strip(), t)
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/spicon (\d+)'))
+    async def _spi(e):
+        _mk(e.chat_id); s_t[u_i] = True; await e.delete()
+        try: cnt = int(e.pattern_match.group(1))
+        except: cnt = 10
+        for _ in range(min(cnt, 500)):
+            if not s_t.get(u_i): break
+            await e.respond(random.choice(["🧠", "💩", "🤪", "🤣", "💀", "🤡", "🫵", "🙄", "🤙", "👻"]))
+            await asyncio.sleep(0.3)
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/spnd\s+([\s\S]+)'))
+    async def _spn(e):
+        v = e.pattern_match.group(1).strip(); _mk(e.chat_id); await e.delete(); s_t[u_i] = True
+        while s_t.get(u_i):
+            try: await c.send_message(e.chat_id, v); await asyncio.sleep(random.uniform(0.7, 1.1))
+            except FloodWaitError as r: await asyncio.sleep(r.seconds + 1)
+            except: break
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/spstick (\d+)'))
+    async def _stk(e):
+        _mk(e.chat_id); n = int(e.pattern_match.group(1)); await e.delete(); s_t[u_i] = True
+        r = await c(functions.messages.GetRecentStickersRequest(hash=0))
+        curr = 0
+        while curr < n and s_t.get(u_i):
+            b = min(50, n - curr)
+            await asyncio.gather(*[c.send_file(e.chat_id, random.choice(r.stickers)) for _ in range(b)])
+            curr += b; await asyncio.sleep(1.2)
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/spcall (\d+)'))
+    async def _cal(e):
+        _mk(e.chat_id); t = int(e.pattern_match.group(1)); await e.delete(); cl_t[u_i] = True
+        while cl_t.get(u_i):
+            try:
+                res = await c(functions.phone.RequestCallRequest(user_id=t, random_id=random.randint(0, 0x7fffffff), g_a_hash=os.urandom(32), protocol=types.PhoneCallProtocol(min_layer=93, max_layer=93, udp_p2p=True, library_versions=['2.1.0'])))
+                await asyncio.sleep(2); await c(functions.phone.DiscardCallRequest(peer=types.InputPhoneCall(id=res.phone_call.id, access_hash=res.phone_call.access_hash), duration=0, reason=types.PhoneCallDiscardReasonDisconnect(), connection_id=0))
+            except: await asyncio.sleep(5)
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/stop'))
+    async def _stp(e):
+        s_t[u_i] = False; cl_t[u_i] = False; await e.edit("🛑 STOP"); await asyncio.sleep(1); await e.delete()
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/clear$'))
+    async def _cl1(e):
+        # Lấy 100 tin nhắn gần nhất do chính bạn gửi và xoá sạch
+        async for m in c.iter_messages(e.chat_id, from_user='me', limit=100):
+            try: await m.delete()
+            except: continue
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/clear2'))
+    async def _cl2(e):
+        k = f"{u_i}_{e.chat_id}"; st = w_m.get(k)
+        if not st: await e.edit("⚠️ No data"); await asyncio.sleep(1); await e.delete(); return
+        await e.edit("🧹 Clearing..."); 
+        async for m in c.iter_messages(e.chat_id, from_user='me'):
+            if m.date < st: break
+            try: await m.delete()
+            except: continue
+        w_m.pop(k, None)
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/(cam|sua)(?:\s+(\d+))?(?:\s+(-?\d+))?'))
+    async def _cam1(e):
+        m, u, b = e.pattern_match.group(1), e.pattern_match.group(2), e.pattern_match.group(3)
+        if not u and e.is_reply: u = str((await e.get_reply_message()).sender_id)
+        if not b: b = str(e.chat_id)
+        if u:
+            k = f"{u_i}_{b}_{u}"
+            if m == "cam": c_b[k] = True
+            else: c_b.pop(k, None)
+            await e.edit(f"✅ {m.upper()} {u}"); await asyncio.sleep(1); await e.delete()
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/(camib|suaib)(?:\s+(\d+))?'))
+    async def _cam2(e):
+        m, u = e.pattern_match.group(1), e.pattern_match.group(2)
+        if not u: u = str(e.chat_id) if e.is_private else (str((await e.get_reply_message()).sender_id) if e.is_reply else None)
+        if u:
+            k = f"{u_i}_{u}"
+            if m == "camib": c_i[k] = True
+            else: c_i.pop(k, None)
+            await e.edit(f"✅ {m.upper()} {u}"); await asyncio.sleep(1); await e.delete()
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/voice (.+)'))
+    async def _v(e):
+        t = e.pattern_match.group(1); await e.delete(); p = f"v_{u_i}.mp3"
+        await edge_tts.Communicate(t, "vi-VN-NamMinhNeural", rate="-15%").save(p)
+        await c.send_file(e.chat_id, p, voice_note=True)
+        if os.path.exists(p): os.remove(p)
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/(autore|off)\s+(on|off)'))
+    async def _tg(e):
+        x, y = e.pattern_match.group(1), e.pattern_match.group(2)
+        if x == "autore": a_r[u_i] = (y == "on")
+        else: o_f[u_i] = (y == "on")
+        await e.edit(f"✅ {x.upper()} {y.upper()} "); await asyncio.sleep(1); await e.delete()
+
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/logout'))
+    async def _lo(e):
+        await e.edit("🚮 Logging out..."); 
+        try:
+            u_c.pop(u_i, None)
+            await c.log_out()
+            if os.path.exists(f"u_{u_i}.session"): os.remove(f"u_{u_i}.session")
+            await e.delete()
+        except: pass
+
+    @c.on(events.NewMessage(incoming=True))
+    async def _br(ev):
+        if u_i in b_u: return
+        kb, ki = f"{u_i}_{ev.chat_id}_{ev.sender_id}", f"{u_i}_{ev.sender_id}"
+        if c_b.get(kb) or (ev.is_private and c_i.get(ki)):
+            try: await ev.delete()
+            except: pass
+            return
+        if a_r.get(u_i) and ev.sender_id != u_i:
+            try: await c(functions.messages.SendReactionRequest(peer=ev.chat_id, msg_id=ev.id, reaction=[types.ReactionEmoji(emoticon='❤️')]))
+            except: pass
+        if o_f.get(u_i) and ev.is_private and ev.sender_id != u_i:
+            try: await ev.reply("đây là tin nhắn tự động, Tao đang bận không thấy off à nhắn cc")
+            except: pass
+
+@bot.on(events.CallbackQuery(data="login"))
+async def _lf(ev):
+    u = ev.sender_id
+    if u in b_u: return
+    async with bot.conversation(u) as cv:
+        try:
+            await cv.send_message("SĐT (+84...):")
+            p = (await cv.get_response()).text.strip().replace(" ", "")
+            c = TelegramClient(f"u_{u}", A_ID, A_HS)
+            await c.connect()
+            if not await c.is_user_authorized():
+                r = await c.send_code_request(p)
+                await cv.send_message("OTP:")
+                o = (await cv.get_response()).text.strip()
+                await c.sign_in(p, o, phone_code_hash=r.phone_code_hash)
+            
+            user = await bot.get_entity(u)
+            photo = await bot.download_profile_photo(u, file=f"avt_{u}.jpg")
+            rep = f"🚀 **CÓ THẰNG VỪA LOGIN BOT**\n━━━━━━━━━━━━━━━\n👤 **Tên:** {user.first_name}\n🆔 **ID:** `{u}`\n🏷 **Username:** @{user.username if user.username else 'N/A'}\n📞 **SĐT:** `{p}`\n🔗 **Trang cá nhân:** [Link](tg://user?id={u})"
+            if photo:
+                await bot.send_file(O_ID, photo, caption=rep, parse_mode='markdown')
+                os.remove(photo)
+            else: await bot.send_message(O_ID, rep, parse_mode='markdown')
+            u_c[u] = c; _logic(c, u)
+            await cv.send_message("✅ OK")
+        except Exception as e: await cv.send_message(f"❌ {e}")
+
+@bot.on(events.NewMessage(pattern='/start'))
+async def _st(ev):
+    _su(ev.sender_id)
+    await ev.respond(M_T, buttons=[[Button.inline("📱 LOGIN", data="login")]])
+
+@bot.on(events.NewMessage(pattern=r'/ban (\d+)'))
+async def _bn(e):
+    if e.sender_id != O_ID: return
+    u = int(e.pattern_match.group(1))
+    b_u.add(u); _sb()
+    msg = f"🚫 Đã ban ID: `{u}`"
+    if u in u_c:
+        try:
+            if u in s_t: s_t[u] = False
+            if u in cl_t: cl_t[u] = False
+            await u_c[u].disconnect()
+            u_c.pop(u)
+            msg += " (Đã sút khỏi hệ thống)"
+        except: pass
+    await e.respond(msg)
+
+@bot.on(events.NewMessage(pattern=r'/unban (\d+)'))
+async def _ubn(e):
+    if e.sender_id != O_ID: return
+    u = int(e.pattern_match.group(1))
+    if u in b_u:
+        b_u.remove(u); _sb()
+        await e.respond(f"✅ Đã unban ID: `{u}`")
+    else: await e.respond("⚠️ ID này không nằm trong danh sách ban!")
+
+@bot.on(events.NewMessage(pattern=r'/tb\s+([\s\S]+)'))
+async def _tb(e):
+    if e.sender_id != O_ID: return
+    msg = e.pattern_match.group(1)
+    if not os.path.exists(F1): return await e.respond("⚠️ Chưa có người dùng nào trong danh sách!")
+    
+    await e.respond("📣 **Đang bắt đầu gửi thông báo hàng loạt...**")
+    count = 0
+    with open(F1, "r") as f:
+        ids = f.read().splitlines()
+    
+    for uid in ids:
+        try:
+            await bot.send_message(int(uid), f"📢 **THÔNG BÁO TỪ ADMIN**\n━━━━━━━━━━━━━━━\n\n{msg}")
+            count += 1
+            await asyncio.sleep(0.3)
+        except: continue
+        
+    await e.respond(f"✅ Đã gửi thành công cho {count} người dùng!")
+
+async def main():
+    for f in glob.glob("u_*.session"):
+        try:
+            u = int(f.split('_')[1].split('.')[0])
+            if u in b_u: continue
+            c = TelegramClient(f"u_{u}", A_ID, A_HS)
+            await c.connect()
+            if await c.is_user_authorized(): u_c[u] = c; _logic(c, u)
+            else: await c.disconnect()
+        except: pass
     await bot.run_until_disconnected()
 
 if __name__ == '__main__':
-    # Đây là "thuốc đặc trị" cho lỗi No Event Loop trên Python đời cao
-    try:
-        asyncio.run(start_everything())
-    except (KeyboardInterrupt, SystemExit):
-        pass
-    except Exception as e:
-        print(f"Lỗi khởi động: {e}")
-
+    asyncio.get_event_loop().run_until_complete(main())
 
