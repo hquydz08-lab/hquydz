@@ -8,76 +8,51 @@ import sys
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telethon import TelegramClient, events, functions, types
 from telethon.sessions import StringSession
-import edge_tts
 
 # --- CẤU HÌNH HỆ THỐNG ---
-A_ID = 34619338
-A_HS = '0f9eb480f7207cf57060f2f35c0ba137'
-B_TK = '8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4'
-O_ID = 7153197678 
+API_ID = 34619338
+API_HASH = '0f9eb480f7207cf57060f2f35c0ba137'
+BOT_TOKEN = '8628695487:AAGBj8QL8ZWEEoTxMNx6CJ3ZMVKohzI68C4'
+OWNER_ID = 7153197678 
 
-U1 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/chui.txt"
-U2 = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/spam2.txt"
+URL_CHUI = "https://raw.githubusercontent.com/ehvuebe-png/Cailontaone/main/chui.txt"
 
-# --- SERVER HEALTH CHECK (NGĂN RENDER STATUS 1) ---
+# --- RENDER HEALTH CHECK ---
 class HealthCheck(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        self.send_header('Content-type', 'text/plain')
         self.end_headers()
-        self.wfile.write(b"BOT STATUS: ACTIVE & GREEN")
+        self.wfile.write(b"ONLINE")
     def log_message(self, format, *args): return
 
-def run_port_server():
+def run_server():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(('0.0.0.0', port), HealthCheck)
-    print(f"Health server started on port {port}")
     server.serve_forever()
 
-# --- QUẢN LÝ DỮ LIỆU ---
-def _load_list(f):
+# --- QUẢN LÝ FILE ---
+def _load(f):
     if not os.path.exists(f): return []
     try:
         with open(f, "r", encoding="utf-8") as file: return file.read().splitlines()
     except: return []
 
-def _save_list(f, data):
+def _save(f, d):
     try:
-        with open(f, "w", encoding="utf-8") as file: file.write("\n".join(map(str, data)))
-    except: pass
-
-def _load_keys():
-    if not os.path.exists("keys.txt"): return {}
-    keys = {}
-    try:
-        with open("keys.txt", "r", encoding="utf-8") as f:
-            for line in f:
-                if "|" in line:
-                    k, exp = line.strip().split("|")
-                    keys[k] = exp if exp == "forever" else datetime.datetime.fromisoformat(exp)
-    except: pass
-    return keys
-
-def _save_keys(keys):
-    try:
-        with open("keys.txt", "w", encoding="utf-8") as f:
-            for k, exp in keys.items():
-                val = exp if exp == "forever" else exp.isoformat()
-                f.write(f"{k}|{val}\n")
+        with open(f, "w", encoding="utf-8") as file: file.write("\n".join(map(str, d)))
     except: pass
 
 # --- KHỞI TẠO ---
-ADMINS = set([O_ID])
-for a in _load_list("admins.txt"): 
+ADMINS = set([OWNER_ID])
+for a in _load("admins.txt"): 
     if a.strip(): ADMINS.add(int(a))
 
-bot = TelegramClient('bot_manage_session', A_ID, A_HS)
-u_c, s_t, d_l, s_l = {}, {}, {}, {}
+bot = TelegramClient('bot_manage_session', API_ID, API_HASH)
+user_clients = {}
+spam_active = {}
+user_delays = {}
 
-M_T = """. 　˚　. . ✦˚ .     　　˚　　　　✦　.
-𖣘 Hai Quy.   2026 𖣘
-.  ˚　.　 . ✦　˚　 .   .　.  　˚　  　.
-
+MENU_TEXT = """𖣘 Hai Quy.   2026 𖣘
 🔥 **𝑺𝒑𝒂𝒎 & 𝑻𝒂𝒈**
 ┣ /sp <id> - Spam chửi
 ┣ /sp2 <id> - Spam nội dung
@@ -96,115 +71,97 @@ M_T = """. 　˚　. . ✦˚ .     　　˚　　　　✦　.
 📦 **𝑳𝒂‌𝒕 𝑽𝒂‌𝒕**
 ┣ /info <@/id/rep> - Soi trang
 ┣ /fake <@/id/rep> - Fake người khác
-┣ /diefake - về lại acc gốc
+┣ /diefake - Về lại acc gốc
 ┣ /voice <text> - Voice
-┣ /autore <on/off> - Tự động thả tim
+┣ /autore <on/off> - Tự thả tim
 ┣ /off <on/off> - Chế độ bận
 ┣ /stop - Dừng tất cả
-┣ /clear - Xóa 100 tin nhắn
+┣ /clear - Xóa 100 tin
 ┣ /checkkey - Kiểm tra key
 ┣ /logout - Thoát acc
 ┗ /setdelay - Chỉnh tốc độ
 
 👤 **ADMIN: Hquy**"""
 
-# --- LOGIC ADMIN ---
+# --- LỆNH ADMIN ---
 @bot.on(events.NewMessage(pattern='/ad'))
-async def _ad(e):
+async def admin_panel(e):
     if e.sender_id in ADMINS:
-        msg = "🛠 **ADMIN PANEL**\n/taokey <tên> <day/week/month/forever>\n/xoakey <tên>\n/addadmin <id>\n/deladmin <id>\n/tb <nội dung>"
-        await e.respond(msg)
+        await e.respond("🛠 **ADMIN CONTROL**\n/addadmin <id>\n/taokey <tên> <hạn>\n/tb <nội dung>")
 
 @bot.on(events.NewMessage(pattern=r'/addadmin (\d+)'))
-async def _aa(e):
-    if e.sender_id != O_ID: return
+async def add_ad(e):
+    if e.sender_id != OWNER_ID: return
     nid = int(e.pattern_match.group(1))
-    ADMINS.add(nid); _save_list("admins.txt", list(ADMINS))
-    await e.respond(f"✅ Đã thêm Admin: `{nid}`")
+    ADMINS.add(nid); _save("admins.txt", list(ADMINS))
+    await e.respond(f"✅ Thêm Admin: `{nid}`")
 
-@bot.on(events.NewMessage(pattern=r'/taokey (.+) (day|week|month|forever)'))
-async def _tk(e):
-    if e.sender_id not in ADMINS: return
-    k, t = e.pattern_match.group(1).strip(), e.pattern_match.group(2)
-    now = datetime.datetime.now()
-    exp = (now + datetime.timedelta(days=1) if t=='day' else 
-           now + datetime.timedelta(weeks=1) if t=='week' else 
-           now + datetime.timedelta(days=30) if t=='month' else "forever")
-    ks = _load_keys(); ks[k] = exp; _save_keys(ks)
-    await e.respond(f"🔑 Tạo Key `{k}` ({t}) thành công!")
-
-@bot.on(events.NewMessage(pattern=r'/tb (.+)'))
-async def _tb(e):
-    if e.sender_id not in ADMINS: return
-    msg = e.pattern_match.group(1)
-    for uid in _load_list("users.txt"):
-        try: await bot.send_message(int(uid), f"📢 **TB Admin:** {msg}")
-        except: pass
-    await e.respond("✅ Đã gửi thông báo!")
-
-# --- LOGIC NGƯỜI DÙNG ---
+# --- LỆNH USER ---
 @bot.on(events.NewMessage(pattern='/start'))
-async def _start(ev):
-    us = set(_load_list("users.txt")); us.add(str(ev.sender_id)); _save_list("users.txt", list(us))
-    await ev.respond(M_T)
-
-@bot.on(events.NewMessage(pattern=r'/nhapkey (.+)'))
-async def _nk(e):
-    kin = e.pattern_match.group(1).strip()
-    ks = _load_keys()
-    if kin in ks or kin == "masterkey":
-        auths = set(_load_list("auth.txt")); auths.add(str(e.sender_id)); _save_list("auth.txt", list(auths))
-        await e.respond("✅ Kích hoạt thành công! Dùng `/login`.")
-    else: await e.respond("❌ Key sai!")
+async def start_cmd(e):
+    u = set(_load("users.txt")); u.add(str(e.sender_id)); _save("users.txt", list(u))
+    await e.respond(MENU_TEXT)
 
 @bot.on(events.NewMessage(pattern='/login'))
-async def _lg(ev):
-    if str(ev.sender_id) not in _load_list("auth.txt"):
-        await ev.respond("❌ Nhập key trước sếp!"); return
-    async with bot.conversation(ev.sender_id) as cv:
+async def login_cmd(e):
+    async with bot.conversation(e.sender_id) as conv:
         try:
-            await cv.send_message("📱 **SĐT (+84...):**")
-            p = (await cv.get_response()).text.strip().replace(" ", "")
-            c = TelegramClient(StringSession(), A_ID, A_HS); await c.connect()
-            r = await c.send_code_request(p)
-            await cv.send_message("📩 **OTP:**")
-            o = (await cv.get_response()).text.strip().replace(".", "")
-            await c.sign_in(p, o, phone_code_hash=r.phone_code_hash)
-            u_c[ev.sender_id] = c; _logic(c, ev.sender_id); await cv.send_message("✅ LOGIN THÀNH CÔNG!")
-        except Exception as e: await cv.send_message(f"❌ Lỗi: {str(e)}")
+            await conv.send_message("📱 **SĐT (+84...):**")
+            phone = (await conv.get_response()).text.strip()
+            client = TelegramClient(StringSession(), API_ID, API_HASH); await client.connect()
+            code_req = await client.send_code_request(phone)
+            await conv.send_message("📩 **Mã OTP:**")
+            otp = (await conv.get_response()).text.strip().replace(".", "")
+            await client.sign_in(phone, otp, phone_code_hash=code_req.phone_code_hash)
+            user_clients[e.sender_id] = client
+            _handle_user_logic(client, e.sender_id)
+            await conv.send_message("✅ Đăng nhập hoàn tất!")
+        except Exception as ex:
+            await conv.send_message(f"❌ Lỗi: {str(ex)}")
 
-def _logic(c, ui):
+def _handle_user_logic(c, uid):
     @c.on(events.NewMessage(outgoing=True, pattern=r'/sp (\d+)'))
-    async def _sp(e):
-        t = int(e.pattern_match.group(1)); s_t[ui] = True; await e.delete()
-        delay = d_l.get(ui, 0.3)
-        while s_t.get(ui):
+    async def sp_chui(e):
+        target = int(e.pattern_match.group(1))
+        spam_active[uid] = True; await e.delete()
+        delay = user_delays.get(uid, 0.3)
+        while spam_active.get(uid):
             try:
-                r = requests.get(U1, timeout=5)
-                for m in r.text.splitlines():
-                    if not s_t.get(ui): break
-                    await c.send_message(e.chat_id, f"{m.strip()} [\u200b](tg://user?id={t})")
+                lines = requests.get(URL_CHUI).text.splitlines()
+                for l in lines:
+                    if not spam_active.get(uid): break
+                    await c.send_message(e.chat_id, f"{l.strip()} [\u200b](tg://user?id={target})")
                     await asyncio.sleep(delay)
             except: break
 
     @c.on(events.NewMessage(outgoing=True, pattern='/stop'))
-    async def _stp(e): s_t[ui] = False; await e.edit("🛑 Đã dừng.")
+    async def stop_all(e):
+        spam_active[uid] = False; await e.edit("🛑 Đã dừng toàn bộ spam.")
 
-# --- KHỞI CHẠY ---
-async def start_bot():
-    await bot.start(bot_token=B_TK)
-    print("Bot đang trực tuyến!")
+    @c.on(events.NewMessage(outgoing=True, pattern=r'/setdelay ([\d.]+)'))
+    async def set_dl(e):
+        user_delays[uid] = float(e.pattern_match.group(1))
+        await e.edit(f"✅ Đã chỉnh delay: {user_delays[uid]}s")
+
+# --- KHỞI CHẠY (FIX TRIỆT ĐỂ LỖI LOOP) ---
+async def start_system():
+    # Chạy Server Health Check
+    threading.Thread(target=run_server, daemon=True).start()
+    
+    # Khởi động Bot Management
+    await bot.start(bot_token=BOT_TOKEN)
+    print("Hệ thống đã sẵn sàng!")
     await bot.run_until_disconnected()
 
 if __name__ == '__main__':
-    # Chạy server Port 10000 ở luồng riêng
-    threading.Thread(target=run_port_server, daemon=True).start()
-    
-    # Ép buộc tạo vòng lặp mới chống treo Render
+    # Ép buộc tạo loop mới để tương thích với mọi môi trường Python trên Render
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(start_bot())
-    except Exception as e:
-        print(f"Lỗi: {e}")
-        sys.exit(0) # Thoát sạch sẽ nếu có lỗi để Render restart lại
+        loop.run_until_complete(start_system())
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    except Exception as err:
+        print(f"Lỗi khởi động: {err}")
+
+
